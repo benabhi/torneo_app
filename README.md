@@ -4,6 +4,8 @@ Este proyecto es una aplicación de escritorio para la gestión completa de torn
 
 La interfaz gráfica está construida con Tkinter (`ttk`) y los datos se almacenan de forma persistente en una base de datos SQLite. Además, el proyecto cuenta con una suite de tests automatizados para garantizar su fiabilidad y robustez.
 
+![screenshot](screenshot.png)
+
 ## Características Principales
 
 *   **Gestión Completa del Torneo:**
