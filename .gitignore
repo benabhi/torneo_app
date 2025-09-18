@@ -1,0 +1,13 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Opcional: entornos virtuales
+.venv/
+venv/
+env/
+
+# Opcional: otros temporales
+*.log
+*.sqlite3
