@@ -120,10 +120,29 @@ class App(tk.Tk):
         self.color_labels = []
 
         # --- 5. Construcción de la Estructura Principal de la GUI ---
-        # El Notebook es el widget que gestiona el sistema de pestañas.
+        # *** INICIO DE LA CORRECCIÓN ***
+        # Se empaqueta la BARRA DE ESTADO PRIMERO para que reserve su espacio en la parte inferior.
+        self.status_bar = ttk.Frame(self, relief="sunken")
+        self.status_bar.pack(side="bottom", fill="x", padx=1, pady=1)
+
+        # Etiqueta para mostrar el total de equipos. Se alinea a la izquierda.
+        self.status_label_equipos = ttk.Label(self.status_bar, text="Equipos: 0", anchor="w")
+        self.status_label_equipos.pack(side="left", padx=10, pady=2)
+
+        # Etiqueta para mostrar la fase actual del torneo.
+        self.status_label_fase = ttk.Label(self.status_bar, text="Fase: Configuración", anchor="w")
+        self.status_label_fase.pack(side="left", padx=10, pady=2)
+
+        # Etiqueta para mensajes de estado. Se alinea a la derecha para que no
+        # se solape con las otras etiquetas.
+        self.status_label_mensaje = ttk.Label(self.status_bar, text="Listo", anchor="e")
+        self.status_label_mensaje.pack(side="right", padx=10, pady=2)
+
+        # AHORA se empaqueta el NOTEBOOK, que ocupará todo el espacio restante.
         self.notebook = ttk.Notebook(self)
         self.notebook.pack(pady=10, padx=10, expand=True, fill="both")
         self.notebook.enable_traversal() # Permite navegar entre pestañas con Ctrl+Tab.
+        # *** FIN DE LA CORRECCIÓN ***
 
         # Se crean los Frames (contenedores) para cada pestaña.
         self.frame_equipos = ttk.Frame(self.notebook)
@@ -162,6 +181,36 @@ class App(tk.Tk):
         if str.isdigit(P) or P == "":
             return True
         return False
+
+    def _actualizar_barra_estado(self, mensaje="Listo"):
+        """
+        Actualiza la información mostrada en la barra de estado inferior.
+
+        Este método centraliza la lógica para refrescar las etiquetas de la barra
+        de estado, como el número total de equipos y la fase actual del torneo.
+        También permite mostrar un mensaje temporal sobre la última acción realizada.
+
+        Args:
+            mensaje (str): El mensaje a mostrar en la parte derecha de la barra.
+                           Por defecto es "Listo".
+        """
+        # Actualiza el contador de equipos consultando la base de datos.
+        total_equipos = len(database.db.obtener_equipos())
+        self.status_label_equipos.config(text=f"Equipos: {total_equipos}")
+
+        # Determina y muestra la fase actual del torneo.
+        fase_actual_texto = "Configuración"
+        if database.db.fase_grupos_bloqueada():
+            # Aquí se podría añadir lógica más compleja para detectar la fase
+            # eliminatoria específica (Cuartos, Semifinal, etc.).
+            fase_actual_texto = "Fases Eliminatorias"
+        elif database.db.equipos_bloqueados():
+            fase_actual_texto = "Fase de Grupos"
+
+        self.status_label_fase.config(text=f"Fase: {fase_actual_texto}")
+
+        # Muestra el mensaje de estado pasado como argumento.
+        self.status_label_mensaje.config(text=mensaje)
 
     def _update_ui_state(self):
         """
@@ -336,7 +385,7 @@ class App(tk.Tk):
         if messagebox.askyesno("Confirmar y Bloquear", "Está a punto de bloquear la lista de equipos.\n\nDespués de esto, no podrá agregar, modificar o eliminar equipos.\n¿Desea continuar?"):
             database.db.establecer_config('equipos_bloqueados', '1')
             logger.warning("¡Lista de equipos bloqueada!")
-            self.actualizar_todas_las_vistas()
+            self.actualizar_todas_las_vistas("Lista de equipos bloqueada. Puede proceder a la Fase de Grupos.")
             messagebox.showinfo("Lista Bloqueada", "La lista de equipos ha sido bloqueada. Ahora puede proceder a la Fase de Grupos.")
             self.notebook.select(self.frame_grupos) # Cambia a la siguiente pestaña.
 
@@ -345,7 +394,7 @@ class App(tk.Tk):
         if messagebox.askyesno("Confirmar Borrado Total", "¡ADVERTENCIA!\n\nEsto borrará permanentemente TODOS los equipos y partidos de la base de datos.\n\n¿Está absolutamente seguro de que desea continuar?"):
             database.db.borrar_todos_los_datos()
             logger.critical("¡TODOS LOS DATOS HAN SIDO BORRADOS POR EL USUARIO!")
-            self.actualizar_todas_las_vistas()
+            self.actualizar_todas_las_vistas("Todos los datos del torneo han sido eliminados.")
             messagebox.showinfo("Operación Completada", "Todos los datos del torneo han sido eliminados.")
 
     def crear_widgets_grupos(self):
@@ -457,7 +506,7 @@ class App(tk.Tk):
         if messagebox.askyesno("Confirmar y Bloquear", "Está a punto de bloquear la fase de grupos.\n\nDespués de esto, no podrá registrar nuevos resultados.\n¿Desea continuar?"):
             database.db.establecer_config('fase_grupos_bloqueada', '1')
             logger.warning("¡Fase de grupos bloqueada!")
-            self._update_ui_state()
+            self.actualizar_todas_las_vistas("Fase de grupos bloqueada. Puede generar las fases eliminatorias.")
             self._actualizar_vista_eliminatorias()
             messagebox.showinfo("Fase Bloqueada", "La fase de grupos ha sido bloqueada. Ahora puede generar las fases eliminatorias.")
             self.notebook.select(self.frame_eliminatorias)
@@ -466,7 +515,7 @@ class App(tk.Tk):
         """Acción del botón 'Reiniciar Resultados'. Borra todos los partidos de grupos."""
         if messagebox.askyesno("Reiniciar Resultados", "Esto borrará TODOS los resultados de la fase de grupos.\nLos equipos no serán eliminados.\n\n¿Desea continuar?"):
             database.db.reiniciar_fase_grupos()
-            self.actualizar_todas_las_vistas()
+            self.actualizar_todas_las_vistas("Resultados de la fase de grupos eliminados.")
             messagebox.showinfo("Resultados Eliminados", "Todos los resultados de la fase de grupos han sido eliminados.")
 
     def autogenerar_equipos_prueba(self):
@@ -483,11 +532,11 @@ class App(tk.Tk):
                 database.db.agregar_equipo(nombre_equipo, zona)
                 contador_equipo += 1
 
-        self.actualizar_todas_las_vistas()
+        self.actualizar_todas_las_vistas(f"Se generaron {contador_equipo - 1} equipos de prueba.")
         logger.info("Finalizada la autogeneración de equipos.")
         messagebox.showinfo("Éxito", f"Se han generado {contador_equipo - 1} equipos de prueba.")
 
-    def actualizar_todas_las_vistas(self):
+    def actualizar_todas_las_vistas(self, mensaje="Listo"):
         """Método central para refrescar toda la información de la GUI."""
         zona_seleccionada_actualmente = self.combo_zona_partidos.get()
 
@@ -503,6 +552,7 @@ class App(tk.Tk):
         self.actualizar_tablas()
         self._actualizar_vista_eliminatorias()
         self._update_ui_state()
+        self._actualizar_barra_estado(mensaje)
 
     def agregar_equipo(self):
         """Acción del botón 'Agregar'. Valida la entrada y llama a la base de datos."""
@@ -517,6 +567,7 @@ class App(tk.Tk):
                 self.actualizar_lista_equipos()
                 self.entry_nombre.delete(0, tk.END)
                 self._update_ui_state()
+                self._actualizar_barra_estado(f"Equipo '{nombre}' agregado exitosamente.")
             else:
                 # Si falló (equipo duplicado), muestra un error.
                 messagebox.showerror("Error de Duplicado", f"El equipo '{nombre}' ya existe. Por favor, elija otro nombre.")
@@ -542,6 +593,7 @@ class App(tk.Tk):
             return
         item = self.tree_equipos.item(selected_item)
         equipo_id = item['values'][0]
+        nombre_original = item['values'][1]
         nuevo_nombre = self.entry_nombre.get().strip()
         nueva_zona = self.combo_zona.get()
         if nuevo_nombre and nueva_zona:
@@ -549,7 +601,7 @@ class App(tk.Tk):
             if exito:
                 self.actualizar_lista_equipos()
                 self.entry_nombre.delete(0, tk.END)
-                self.actualizar_todas_las_vistas()
+                self.actualizar_todas_las_vistas(f"Equipo '{nombre_original}' actualizado a '{nuevo_nombre}'.")
             else:
                 messagebox.showerror("Error de Duplicado", f"El nombre '{nuevo_nombre}' ya está en uso. Por favor, elija otro nombre.")
         else:
@@ -563,10 +615,12 @@ class App(tk.Tk):
             return
         item = self.tree_equipos.item(selected_item)
         equipo_id = item['values'][0]
-        if messagebox.askyesno("Confirmar", f"¿Está seguro de que desea eliminar al equipo {item['values'][1]}?"):
+        nombre_equipo = item['values'][1]
+        if messagebox.askyesno("Confirmar", f"¿Está seguro de que desea eliminar al equipo {nombre_equipo}?"):
             database.db.eliminar_equipo(equipo_id)
             self.actualizar_lista_equipos()
             self._update_ui_state()
+            self._actualizar_barra_estado(f"Equipo '{nombre_equipo}' eliminado.")
 
     def actualizar_lista_equipos(self):
         """Refresca la tabla de equipos con los datos actuales de la base de datos."""
@@ -635,7 +689,7 @@ class App(tk.Tk):
             if local_id and visitante_id: database.db.registrar_partido("Grupo", local_id, visitante_id, goles_local, goles_visitante)
         logger.info("Finalizada la autogeneración de resultados.")
         messagebox.showinfo("Éxito", f"Se han generado y registrado los resultados de {len(todos_pendientes)} partidos.")
-        self.actualizar_todas_las_vistas()
+        self.actualizar_todas_las_vistas(f"Generados {len(todos_pendientes)} resultados de prueba.")
 
     def cargar_partidos_pendientes(self, event=None):
         """Carga la lista de partidos pendientes para la zona seleccionada."""
@@ -688,7 +742,7 @@ class App(tk.Tk):
         local_id, visitante_id = equipos_map.get(local_nombre), equipos_map.get(visitante_nombre)
         database.db.registrar_partido("Grupo", local_id, visitante_id, goles_local, goles_visitante)
         self._limpiar_formulario_partido()
-        self.actualizar_todas_las_vistas()
+        self.actualizar_todas_las_vistas(f"Resultado guardado: {local_nombre} {goles_local} - {goles_visitante} {visitante_nombre}.")
 
     def _limpiar_formulario_partido(self, event=None):
         """Limpia y resetea el formulario de registro de resultados."""
@@ -900,6 +954,7 @@ class App(tk.Tk):
             inner_frame.pack(fill='x', expand=True, padx=10, pady=5)
             lbl_campeon = ttk.Label(inner_frame, text=f" {ganador_final[0]}", image=self.icon_medal, compound="left", font=("Arial", 16, "bold"), foreground="royalblue", background='#f0f0f0')
             lbl_campeon.pack(pady=15)
+            self._actualizar_barra_estado(f"¡El campeón del torneo es {ganador_final[0]}!")
 
     def _configurar_grid_fase(self, frame_container):
         """Configura las columnas del grid para alinear los partidos en las fases eliminatorias."""
@@ -946,3 +1001,4 @@ class App(tk.Tk):
         logger.warning(f"¡Fase '{fase}' completada y registrada!")
         # Actualiza la vista para mostrar la siguiente fase.
         self._actualizar_vista_eliminatorias()
+        self._actualizar_barra_estado(f"Resultados de {fase} de Final registrados.")
