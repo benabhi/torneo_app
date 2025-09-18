@@ -27,7 +27,7 @@ import random
 from . import database          # Capa de acceso a datos.
 from . import logic             # Capa de reglas de negocio del torneo.
 from . import widgets           # Componentes de GUI personalizados.
-from . import config             # Archivo de configuración central.
+from . import config            # Archivo de configuración central.
 from .logger import logger      # Sistema de registro de eventos.
 import tkfontawesome as fa      # Librería para usar iconos en la GUI.
 
