@@ -516,14 +516,12 @@ class App(tk.Tk):
             self.actualizar_todas_las_vistas("Resultados de la fase de grupos eliminados.")
             messagebox.showinfo("Resultados Eliminados", "Todos los resultados de la fase de grupos han sido eliminados.")
 
-    # --- INICIO DE LA MODIFICACIÓN ---
     def reiniciar_fases_eliminatorias(self):
         """Acción del botón 'Reiniciar Eliminatorias'. Borra todos los partidos de las fases de playoffs."""
         if messagebox.askyesno("Confirmar Reinicio de Eliminatorias", "¡ADVERTENCIA!\n\nEsto borrará TODOS los resultados de las fases eliminatorias (Octavos, Cuartos, etc.).\nLa fase de grupos no se verá afectada.\n\n¿Desea continuar?"):
             database.db.reiniciar_fases_eliminatorias()
             self.actualizar_todas_las_vistas("Fases eliminatorias reiniciadas.")
             messagebox.showinfo("Operación Completada", "Todos los resultados de las fases eliminatorias han sido eliminados.")
-    # --- FIN DE LA MODIFICACIÓN ---
 
     def autogenerar_equipos_prueba(self):
         """Acción del botón 'Generar Equipos'. Llena el torneo con datos de prueba."""
@@ -776,7 +774,7 @@ class App(tk.Tk):
 
     def crear_widgets_eliminatorias(self):
         """Construye la estructura base para la pestaña de 'Fases Eliminatorias'."""
-        # --- INICIO DE LA MODIFICACIÓN ---
+
         # El contenedor principal ahora alojará el área de scroll y el botón inferior.
         main_container = ttk.Frame(self.frame_eliminatorias)
         main_container.pack(fill="both", expand=True)
@@ -804,7 +802,6 @@ class App(tk.Tk):
 
         canvas = tk.Canvas(canvas_container)
         scrollbar = ttk.Scrollbar(canvas_container, orient="vertical", command=canvas.yview)
-        # --- FIN DE LA MODIFICACIÓN ---
 
         self.scrollable_frame = ttk.Frame(canvas)
         def _on_canvas_configure(event):
@@ -841,7 +838,6 @@ class App(tk.Tk):
                 fases_ordenadas.append(fases_map[num_equipos])
             num_equipos //= 2
 
-        # --- INICIO DE LA MODIFICACIÓN ---
         # Se comprueba si existe algún partido de eliminatorias para decidir si se
         # muestra el botón de reinicio.
         hay_partidos_eliminatorios = False
@@ -855,8 +851,6 @@ class App(tk.Tk):
             self.btn_reiniciar_eliminatorias.pack(side="left")
         else:
             self.btn_reiniciar_eliminatorias.pack_forget()
-        # --- FIN DE LA MODIFICACIÓN ---
-
 
         # Si la final ya se jugó, muestra al campeón.
         partidos_final = database.db.obtener_partidos_fase("Final")

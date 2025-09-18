@@ -21,12 +21,10 @@ ZONAS_DEL_TORNEO = ["A", "B"]
 # Total = len(ZONAS_DEL_TORNEO) * EQUIPOS_CLASIFICAN_POR_ZONA
 EQUIPOS_CLASIFICAN_POR_ZONA = 8
 
-# --- INICIO DE LA MODIFICACIÓN ---
 # Define el número máximo de equipos permitidos por zona.
 # Esto previene que se agreguen equipos de más en la fase de gestión.
 # Un valor común es el doble de los que clasifican.
 MAX_EQUIPOS_POR_ZONA = EQUIPOS_CLASIFICAN_POR_ZONA * 2
-# --- FIN DE LA MODIFICACIÓN ---
 
 # --- CONFIGURACIÓN DE LOGGING ---
 # Establecer en True para mostrar logs detallados en la terminal.
