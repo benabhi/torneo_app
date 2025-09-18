@@ -65,12 +65,13 @@ def app(mocker):
 
 def test_agregar_equipo_exitoso(app, mocker):
     """
-    Verifica la lógica del método `agregar_equipo` en el caso de éxito.
-    El test simula que el usuario ha introducido datos válidos.
+    Verifica la lógica del método `agregar_equipo` en el caso de éxito,
+    incluyendo la actualización de la barra de estado.
     """
     # 1. Arrange (Preparar)
+    nombre_equipo = "Equipo Test"
     # Simula que el usuario escribe "Equipo Test" en el campo de nombre.
-    mocker.patch.object(app.entry_nombre, 'get', return_value="Equipo Test")
+    mocker.patch.object(app.entry_nombre, 'get', return_value=nombre_equipo)
     # Simula que el usuario selecciona "A" en el desplegable de zona.
     mocker.patch.object(app.combo_zona, 'get', return_value="A")
 
@@ -80,6 +81,10 @@ def test_agregar_equipo_exitoso(app, mocker):
     mocker.patch.object(app, 'actualizar_lista_equipos')
     mocker.patch.object(app.entry_nombre, 'delete')
     mocker.patch.object(app, '_update_ui_state')
+
+    # Se espía el método de la barra de estado para verificar que es llamado con el mensaje correcto.
+    spy_statusbar = mocker.spy(app, '_actualizar_barra_estado')
+
     # Simula la ventana emergente de error para verificar que NO se llama.
     mock_showerror = mocker.patch('tkinter.messagebox.showerror')
 
@@ -95,6 +100,9 @@ def test_agregar_equipo_exitoso(app, mocker):
     app._update_ui_state.assert_called_once()
     # Verifica que la ventana de error NO apareció.
     mock_showerror.assert_not_called()
+
+    # Verifica que el método de la barra de estado fue llamado con el mensaje correcto.
+    spy_statusbar.assert_called_once_with(f"Equipo '{nombre_equipo}' agregado exitosamente.")
 
 def test_agregar_equipo_duplicado(app, mocker):
     """
@@ -134,3 +142,42 @@ def test_agregar_equipo_campos_vacios(app, mocker):
     lib.database.db.agregar_equipo.assert_not_called()
     # Verifica que se mostró la advertencia correcta al usuario.
     mock_showwarning.assert_called_once_with("Campos vacíos", "Debe ingresar un nombre y seleccionar una zona.")
+
+def test_reiniciar_eliminatorias_confirmado(app, mocker):
+    """
+    Verifica que al confirmar el reinicio de eliminatorias, se llama
+    al método correcto de la base de datos y se actualiza la UI.
+    """
+    # 1. Arrange:
+    # Simula que el usuario hace clic en "Sí" en la ventana de confirmación.
+    mocker.patch('tkinter.messagebox.askyesno', return_value=True)
+    # Espía los métodos que deberían ser llamados.
+    mock_db_call = mocker.spy(lib.database.db, 'reiniciar_fases_eliminatorias')
+    mock_update_call = mocker.spy(app, 'actualizar_todas_las_vistas')
+
+    # 2. Act:
+    app.reiniciar_fases_eliminatorias()
+
+    # 3. Assert:
+    # Verifica que el método de la base de datos fue llamado.
+    mock_db_call.assert_called_once()
+    # Verifica que la UI se actualizó.
+    mock_update_call.assert_called_once()
+
+def test_reiniciar_eliminatorias_cancelado(app, mocker):
+    """
+    Verifica que si el usuario cancela el reinicio, no se realiza
+    ninguna acción en la base de datos.
+    """
+    # 1. Arrange:
+    # Simula que el usuario hace clic en "No".
+    mocker.patch('tkinter.messagebox.askyesno', return_value=False)
+    # Espía el método de la base de datos.
+    mock_db_call = mocker.spy(lib.database.db, 'reiniciar_fases_eliminatorias')
+
+    # 2. Act:
+    app.reiniciar_fases_eliminatorias()
+
+    # 3. Assert:
+    # Verifica que el método de la base de datos NUNCA fue llamado.
+    mock_db_call.assert_not_called()

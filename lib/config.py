@@ -1,4 +1,3 @@
-# lib/config.py
 """
 Módulo de Configuración
 

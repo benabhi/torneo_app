@@ -141,3 +141,39 @@ def test_calcular_tabla_posiciones_simple(db_test):
     tabla_perdedor = tabla[1]
     assert tabla_perdedor["nombre"] == "Equipo Perdedor"
     assert tabla_perdedor["puntos"] == 0 # 0 puntos por una derrota.
+
+def test_reiniciar_fases_eliminatorias_mantiene_grupos(db_test):
+    """
+    Verifica que el reinicio de las eliminatorias borra solo los partidos
+    de fases como 'Octavos' o 'Final', pero deja intactos los de 'Grupo'.
+    """
+    # 1. Arrange (Preparar):
+    # Se crean 4 equipos para simular las fases.
+    db_test.agregar_equipo("Equipo A", "A")
+    db_test.agregar_equipo("Equipo B", "A")
+    db_test.agregar_equipo("Equipo C", "B")
+    db_test.agregar_equipo("Equipo D", "B")
+    equipos = db_test.obtener_equipos()
+    id_a, id_b, id_c, id_d = equipos[0][0], equipos[1][0], equipos[2][0], equipos[3][0]
+
+    # Se registra un partido de fase de grupos.
+    db_test.registrar_partido("Grupo", id_a, id_b, 1, 0)
+    # Se registran dos partidos de eliminatorias.
+    db_test.registrar_partido("Octavos", id_a, id_c, 2, 1)
+    db_test.registrar_partido("Final", id_b, id_d, 0, 3)
+
+    # Verificación inicial: deben existir 3 partidos en total.
+    assert len(db_test.cursor.execute("SELECT * FROM partidos").fetchall()) == 3
+
+    # 2. Act (Actuar):
+    # Se ejecuta el método que se quiere probar.
+    db_test.reiniciar_fases_eliminatorias()
+
+    # 3. Assert (Verificar):
+    # Se obtienen todos los partidos restantes en la base de datos.
+    partidos_restantes = db_test.cursor.execute("SELECT * FROM partidos").fetchall()
+
+    # Debe quedar exactamente 1 partido.
+    assert len(partidos_restantes) == 1
+    # Y ese partido debe ser el de la fase de "Grupo".
+    assert partidos_restantes[0][1] == "Grupo"

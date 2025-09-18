@@ -319,6 +319,14 @@ class Database:
         self.conn.commit()
         logger.warning("Resultados de la fase de grupos han sido reiniciados.")
 
+    def reiniciar_fases_eliminatorias(self):
+        """Borra únicamente los partidos que NO pertenecen a la fase de grupos."""
+        # Esta consulta elimina todos los registros de la tabla 'partidos'
+        # cuya fase sea diferente a 'Grupo', reseteando así Octavos, Cuartos, etc.
+        self.cursor.execute("DELETE FROM partidos WHERE fase != 'Grupo'")
+        self.conn.commit()
+        logger.warning("Resultados de las fases eliminatorias han sido reiniciados.")
+
     def calcular_tabla_posiciones(self, zona):
         """
         Calcula y devuelve la tabla de posiciones completa para una zona.
