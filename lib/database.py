@@ -193,6 +193,18 @@ class Database:
         """Comprueba si la gestión de equipos está bloqueada, devolviendo True o False."""
         return self.obtener_config('equipos_bloqueados') == '1'
 
+    def desbloquear_equipos(self):
+        """Elimina la bandera de bloqueo de equipos para permitir su edición."""
+        self.cursor.execute("DELETE FROM config WHERE llave = 'equipos_bloqueados'")
+        self.conn.commit()
+        logger.warning("El bloqueo de la lista de equipos ha sido removido.")
+
+    def desbloquear_fase_grupos(self):
+        """Elimina la bandera de bloqueo de la fase de grupos."""
+        self.cursor.execute("DELETE FROM config WHERE llave = 'fase_grupos_bloqueada'")
+        self.conn.commit()
+        logger.warning("El bloqueo de la fase de grupos ha sido removido.")
+
     def _generar_color_unico(self):
         """
         Genera un color hexadecimal aleatorio y verifica que no esté ya en uso.

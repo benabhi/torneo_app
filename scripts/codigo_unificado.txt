@@ -1,3 +1,112 @@
+main.py
+
+"""
+Punto de Entrada Principal de la Aplicación
+
+Este es el script que se debe ejecutar para iniciar el gestor de torneos.
+Su responsabilidad es mínima pero fundamental:
+1. Importar la clase principal de la interfaz gráfica (`App` desde `gui.py`).
+2. Intentar cargar un ícono para la ventana.
+3. Crear una instancia de la clase `App`.
+4. Iniciar el bucle de eventos principal de Tkinter (`mainloop`), que pone
+   en marcha la aplicación y la mantiene en ejecución.
+"""
+
+# Se importa el módulo `os` para interactuar con el sistema operativo,
+# específicamente para construir rutas de archivos de manera robusta.
+import os
+
+# Se importa `PhotoImage` de Tkinter como una forma básica de cargar imágenes.
+# Funciona bien con formatos como .png y .gif, pero no con .ico.
+from tkinter import PhotoImage
+
+# Se importa el módulo `gui` que contiene la clase principal `App`.
+from lib import gui
+
+
+# --- Manejo de Dependencia Opcional (Pillow) ---
+# Se intenta importar las librerías `Image` y `ImageTk` de Pillow (PIL).
+# Pillow es más potente que PhotoImage y soporta más formatos, incluyendo .ico
+# en Windows, y permite un mejor manejo de transparencias.
+try:
+    from PIL import Image, ImageTk
+    # Si la importación tiene éxito, se establece una bandera para usar Pillow.
+    PIL_SUPPORT = True
+except ImportError:
+    # Si Pillow no está instalado, la importación falla y se establece una
+    # bandera para usar la solución de respaldo (PhotoImage de Tkinter).
+    PIL_SUPPORT = False
+
+
+def main():
+    """
+    Función principal que crea y lanza la aplicación.
+    """
+
+    # 1. Crear una instancia de la aplicación.
+    #    Esto ejecuta el método `__init__` de la clase `App`, que construye
+    #    toda la interfaz gráfica en memoria.
+    app = gui.App()
+
+    # 2. Intentar establecer el ícono de la ventana.
+    #    Este bloque está envuelto en un `try...except` para que, si falla
+    #    la carga del ícono, la aplicación pueda continuar ejecutándose
+    #    sin él en lugar de cerrarse con un error.
+    try:
+        # `os.path.abspath(__file__)` obtiene la ruta absoluta de este script.
+        # `os.path.dirname(...)` obtiene el directorio que contiene el script.
+        # Esto asegura que la ruta base sea correcta sin importar desde dónde
+        # se ejecute el programa.
+        base_path = os.path.dirname(os.path.abspath(__file__))
+
+        # Se construye una ruta tentativa para el ícono.
+        icon_path = os.path.join(base_path, 'lib', 'assets', 'icon.png')
+
+        # Si el ícono no se encuentra en la primera ruta, se intenta buscar
+        # directamente en la carpeta raíz del proyecto.
+        if not os.path.exists(icon_path):
+            icon_path = os.path.join(base_path, 'icon.png')
+
+        # Si se encuentra un archivo de ícono en alguna de las rutas.
+        if os.path.exists(icon_path):
+            # Si se dispone de soporte de Pillow (la mejor opción).
+            if PIL_SUPPORT:
+                image = Image.open(icon_path)
+                photo = ImageTk.PhotoImage(image)
+                # `wm_iconphoto` con `True` permite usar objetos de PhotoImage complejos.
+                app.wm_iconphoto(True, photo)
+            # Si no, se usa la opción básica de Tkinter.
+            else:
+                photo = PhotoImage(file=icon_path)
+                # `iconphoto` con `False` es la forma estándar de Tkinter.
+                app.iconphoto(False, photo)
+        # Si el archivo del ícono no se encuentra en ninguna de las rutas esperadas.
+        else:
+             print(f"Advertencia: No se pudo encontrar el icono de la aplicación en '{icon_path}'.")
+
+    # Si ocurre cualquier otro error durante la carga del ícono (ej: archivo corrupto).
+    except Exception as e:
+        print(f"Advertencia: No se pudo cargar el icono de la aplicación.")
+        print(f"Error: {e}")
+
+    # 3. Iniciar el bucle de eventos principal de la aplicación.
+    #    Esta línea es crucial. `mainloop()` pone a Tkinter en un bucle infinito
+    #    donde escucha eventos (clics del ratón, pulsaciones de teclas, etc.)
+    #    y actualiza la GUI en consecuencia. El programa permanecerá en esta
+    #    línea hasta que el usuario cierre la ventana.
+    app.mainloop()
+
+# --- Punto de Entrada del Script ---
+# Esta es una construcción estándar en Python.
+# El bloque de código dentro de este `if` solo se ejecutará cuando este archivo
+# (`main.py`) sea ejecutado directamente por el intérprete de Python.
+# Si otro archivo importara `main.py` (ej: `import main`), este bloque
+# NO se ejecutaría. Esto lo convierte en el punto de partida ideal para la aplicación.
+if __name__ == "__main__":
+    main()
+
+lib\gui.py
+
 """
 Módulo de Interfaz Gráfica (GUI) - El Corazón Visual de la Aplicación
 
@@ -284,31 +393,26 @@ class App(tk.Tk):
                     break
 
             if grupos_estan_bloqueados:
-                # Si la fase de grupos está bloqueada, deshabilita casi todo y muestra el botón para retroceder.
+                # Deshabilita todos los widgets de la pestaña.
                 for child in self.frame_grupos.winfo_children():
                     try: child.config(state='disabled')
-                    except tk.TclError: pass
+                    except tk.TclError: pass # Ignora errores en widgets que no soportan 'state'.
                 self.lbl_info_bloqueo.grid(); self.lbl_info_bloqueo.config(state='normal')
                 self.btn_confirmar_grupos.grid_remove()
-                self.btn_volver_a_equipos.grid_remove()
+                self.btn_reiniciar_carga.grid_remove()
             else:
-                # Si la fase de grupos NO está bloqueada, habilita los controles.
+                # Habilita todos los widgets.
                 for child in self.frame_grupos.winfo_children():
                     try: child.config(state='normal')
                     except tk.TclError: pass
                 self.lbl_info_bloqueo.grid_remove()
-
-                # Solo se puede retroceder si la lista de equipos está bloqueada
-                if equipos_estan_bloqueados:
-                    self.btn_volver_a_equipos.grid()
-                else:
-                    self.btn_volver_a_equipos.grid_remove()
-
                 # Muestra el botón de confirmar fase solo si todos los partidos se han jugado.
                 if todos_jugados and len(database.db.obtener_equipos()) > 0:
                     self.btn_confirmar_grupos.grid()
+                    self.btn_reiniciar_carga.grid()
                 else:
                     self.btn_confirmar_grupos.grid_remove()
+                    self.btn_reiniciar_carga.grid_remove()
 
         # Habilita o deshabilita la pestaña de Fases Eliminatorias.
         self.notebook.tab(2, state='normal' if grupos_estan_bloqueados else 'disabled')
@@ -464,8 +568,8 @@ class App(tk.Tk):
         # Botones inferiores de la pestaña.
         bottom_frame = ttk.Frame(self.frame_grupos); bottom_frame.pack(fill="x")
         bottom_frame.columnconfigure((0,1), weight=1)
-        self.btn_volver_a_equipos = ttk.Button(bottom_frame, text=f" Volver a Equipos", image=self.icon_reset, compound="left", command=self.volver_a_gestion_equipos, style='Danger.TButton')
-        self.btn_volver_a_equipos.grid(row=0, column=0, padx=10, pady=10, sticky="w")
+        self.btn_reiniciar_carga = ttk.Button(bottom_frame, text=f" Reiniciar Resultados", image=self.icon_reset, compound="left", command=self.reiniciar_carga_resultados, style='Danger.TButton')
+        self.btn_reiniciar_carga.grid(row=0, column=0, padx=10, pady=10, sticky="w")
         self.btn_confirmar_grupos = ttk.Button(bottom_frame, text=f"Confirmar Fase ", image=self.icon_next, compound="right", command=self.confirmar_fase_grupos)
         self.btn_confirmar_grupos.grid(row=0, column=1, padx=10, pady=10, sticky="e")
         self.lbl_info_bloqueo = ttk.Label(bottom_frame, text="La fase de grupos está bloqueada.", font=("Arial", 10, "italic"), foreground="blue")
@@ -514,39 +618,19 @@ class App(tk.Tk):
             messagebox.showinfo("Fase Bloqueada", "La fase de grupos ha sido bloqueada. Ahora puede generar las fases eliminatorias.")
             self.notebook.select(self.frame_eliminatorias)
 
-    def volver_a_gestion_equipos(self):
-        """
-        Acción del botón 'Volver a Equipos'.
-        Reinicia la fase de grupos y desbloquea la lista de equipos.
-        """
-        msg = ("¡ADVERTENCIA!\n\n"
-               "Está a punto de volver a la fase de gestión de equipos.\n"
-               "Esto borrará permanentemente TODOS los resultados de la Fase de Grupos.\n\n"
-               "¿Desea continuar?")
-        if messagebox.askyesno("Confirmar Retroceso", msg):
+    def reiniciar_carga_resultados(self):
+        """Acción del botón 'Reiniciar Resultados'. Borra todos los partidos de grupos."""
+        if messagebox.askyesno("Reiniciar Resultados", "Esto borrará TODOS los resultados de la fase de grupos.\nLos equipos no serán eliminados.\n\n¿Desea continuar?"):
             database.db.reiniciar_fase_grupos()
-            database.db.desbloquear_equipos()
-            logger.warning("Retrocediendo a la fase de gestión de equipos.")
-            self.actualizar_todas_las_vistas("Fase de Grupos reiniciada. Puede volver a gestionar los equipos.")
-            messagebox.showinfo("Fase Reiniciada", "Se han borrado los resultados de la fase de grupos y la lista de equipos ha sido desbloqueada.")
-            self.notebook.select(self.frame_equipos)
+            self.actualizar_todas_las_vistas("Resultados de la fase de grupos eliminados.")
+            messagebox.showinfo("Resultados Eliminados", "Todos los resultados de la fase de grupos han sido eliminados.")
 
-    def volver_a_fase_grupos(self):
-        """
-        Acción del botón 'Volver a Fase de Grupos'.
-        Reinicia las eliminatorias y desbloquea la fase de grupos.
-        """
-        msg = ("¡ADVERTENCIA!\n\n"
-               "Está a punto de volver a la Fase de Grupos.\n"
-               "Esto borrará permanentemente TODOS los resultados de las Fases Eliminatorias (Octavos, Cuartos, etc.).\n\n"
-               "¿Desea continuar?")
-        if messagebox.askyesno("Confirmar Retroceso", msg):
+    def reiniciar_fases_eliminatorias(self):
+        """Acción del botón 'Reiniciar Eliminatorias'. Borra todos los partidos de las fases de playoffs."""
+        if messagebox.askyesno("Confirmar Reinicio de Eliminatorias", "¡ADVERTENCIA!\n\nEsto borrará TODOS los resultados de las fases eliminatorias (Octavos, Cuartos, etc.).\nLa fase de grupos no se verá afectada.\n\n¿Desea continuar?"):
             database.db.reiniciar_fases_eliminatorias()
-            database.db.desbloquear_fase_grupos()
-            logger.warning("Retrocediendo a la fase de grupos.")
-            self.actualizar_todas_las_vistas("Fases eliminatorias reiniciadas. Puede volver a la Fase de Grupos.")
-            messagebox.showinfo("Fase Reiniciada", "Se han borrado los resultados de las eliminatorias y la Fase de Grupos ha sido desbloqueada.")
-            self.notebook.select(self.frame_grupos)
+            self.actualizar_todas_las_vistas("Fases eliminatorias reiniciadas.")
+            messagebox.showinfo("Operación Completada", "Todos los resultados de las fases eliminatorias han sido eliminados.")
 
     def autogenerar_equipos_prueba(self):
         """Acción del botón 'Generar Equipos'. Llena el torneo con datos de prueba."""
@@ -810,12 +894,12 @@ class App(tk.Tk):
 
         # Se crea el botón de reinicio y se guarda como un atributo de la instancia
         # para poder mostrarlo u ocultarlo dinámicamente.
-        self.btn_volver_a_grupos = ttk.Button(
+        self.btn_reiniciar_eliminatorias = ttk.Button(
             bottom_controls_frame,
-            text=" Volver a Fase de Grupos",
+            text=" Reiniciar Eliminatorias",
             image=self.icon_reset,
             compound="left",
-            command=self.volver_a_fase_grupos,
+            command=self.reiniciar_fases_eliminatorias,
             style='Danger.TButton'
         )
         # La visibilidad del botón se gestionará en `_actualizar_vista_eliminatorias`.
@@ -863,20 +947,24 @@ class App(tk.Tk):
                 fases_ordenadas.append(fases_map[num_equipos])
             num_equipos //= 2
 
-        # Se comprueba si la fase de grupos está bloqueada para mostrar el botón de retroceso.
-        fase_grupos_esta_bloqueada = database.db.fase_grupos_bloqueada()
-        final_jugada = database.db.obtener_partidos_fase("Final")
+        # Se comprueba si existe algún partido de eliminatorias para decidir si se
+        # muestra el botón de reinicio.
+        hay_partidos_eliminatorios = False
+        for fase in fases_ordenadas:
+            if database.db.obtener_partidos_fase(fase):
+                hay_partidos_eliminatorios = True
+                break
 
-        if fase_grupos_esta_bloqueada and not final_jugada:
-             self.btn_volver_a_grupos.pack(side="left")
+        # Se muestra u oculta el botón basado en la bandera.
+        if hay_partidos_eliminatorios:
+            self.btn_reiniciar_eliminatorias.pack(side="left")
         else:
-             self.btn_volver_a_grupos.pack_forget()
+            self.btn_reiniciar_eliminatorias.pack_forget()
 
         # Si la final ya se jugó, muestra al campeón.
         partidos_final = database.db.obtener_partidos_fase("Final")
         if partidos_final and len(partidos_final) >= 1:
              self._mostrar_campeon()
-             self.btn_volver_a_grupos.pack(side="left")
 
         fase_activa_encontrada = False
         # Itera a través de las fases en orden (Octavos, Cuartos...).
@@ -1065,3 +1153,952 @@ class App(tk.Tk):
         # Actualiza la vista para mostrar la siguiente fase.
         self._actualizar_vista_eliminatorias()
         self._actualizar_barra_estado(f"Resultados de {fase} de Final registrados.")
+
+lib\logic.py
+
+"""
+Módulo de Lógica del Torneo (Motor de Reglas)
+
+Este archivo representa el "cerebro" del torneo. Contiene toda la lógica de
+negocio y las reglas específicas para determinar el flujo de los partidos.
+Es deliberadamente independiente de la interfaz gráfica y de los detalles
+internos de la base de datos. Su única responsabilidad es procesar datos
+y devolver resultados basados en las reglas del torneo.
+
+Funciones clave:
+- generar_fixture_zona: Crea los enfrentamientos para la fase de grupos.
+- generar_enfrentamientos_iniciales: Genera los cruces de la primera fase eliminatoria.
+- obtener_ganadores: Determina los equipos que avanzan de una fase eliminatoria.
+- generar_enfrentamientos: Crea los partidos para las siguientes fases eliminatorias.
+"""
+
+# Se importa 'random' para poder barajar (shuffle) a los ganadores de una fase,
+# asegurando que los siguientes enfrentamientos sean aleatorios.
+import random
+
+# Se importa 'itertools' específicamente por su función 'combinations', que es
+# extremadamente eficiente para generar todos los pares únicos de un grupo
+# (perfecto para un fixture de "todos contra todos").
+import itertools
+
+# Se importa el módulo 'database' completo para poder acceder a su instancia
+# compartida 'db'. Esto es crucial para que los tests puedan reemplazarla.
+from . import database
+
+# Se importa el módulo de configuración para acceder a las reglas del torneo,
+# como la lista de zonas y cuántos equipos clasifican.
+from . import config
+
+# Se importa el logger para registrar información sobre el progreso de la lógica.
+from .logger import logger
+
+
+def generar_fixture_zona(zona):
+    """
+    Genera la lista de partidos pendientes para una zona específica en la fase de grupos.
+
+    Esta función implementa la lógica de "todos contra todos". Primero, calcula
+    todos los enfrentamientos posibles entre los equipos de la zona. Luego, consulta
+    la base de datos para ver qué partidos ya se han jugado y los excluye,
+    devolviendo únicamente los que quedan por disputar.
+
+    Args:
+        zona (str): El nombre de la zona para la cual generar el fixture (ej: "A").
+
+    Returns:
+        list: Una lista de tuplas, donde cada tupla representa un partido
+              pendiente con los nombres de los dos equipos.
+    """
+    # 1. Obtener todos los equipos que pertenecen a la zona especificada.
+    database.db.cursor.execute("SELECT nombre FROM equipos WHERE zona = ?", (zona,))
+    equipos_db = database.db.cursor.fetchall()
+    # Extraer solo los nombres de los equipos de los resultados de la consulta.
+    equipos_nombres = [equipo[0] for equipo in equipos_db]
+
+    # 2. Obtener todos los partidos de fase de grupos que ya han sido registrados
+    #    para esta zona. Es una consulta más compleja que une las tablas 'partidos'
+    #    y 'equipos' para obtener los nombres de los participantes.
+    database.db.cursor.execute("""
+        SELECT el.nombre, ev.nombre
+        FROM partidos p
+        JOIN equipos el ON p.equipo_local_id = el.id
+        JOIN equipos ev ON p.equipo_visitante_id = ev.id
+        WHERE p.fase = 'Grupo' AND el.zona = ?
+    """, (zona,))
+    partidos_jugados_db = database.db.cursor.fetchall()
+
+    # 3. Procesar los partidos jugados para una búsqueda eficiente.
+    #    Se convierte la lista a un 'set' porque la comprobación de pertenencia
+    #    (ej: `if x in my_set`) es mucho más rápida (O(1)) que en una lista (O(n)).
+    #    Además, se "normaliza" cada partido ordenando los nombres de los equipos.
+    #    Esto asegura que ('Equipo A', 'Equipo B') y ('Equipo B', 'Equipo A') se
+    #    traten como el mismo partido, independientemente de la localía.
+    partidos_jugados_set = {tuple(sorted(partido)) for partido in partidos_jugados_db}
+
+    # 4. Generar todos los enfrentamientos posibles ("todos contra todos").
+    #    `itertools.combinations` crea pares únicos de todos los equipos.
+    #    Por ejemplo, para [A, B, C], genera (A, B), (A, C), (B, C).
+    fixture_completo = list(itertools.combinations(equipos_nombres, 2))
+
+    # 5. Filtrar el fixture para obtener solo los partidos pendientes.
+    partidos_pendientes = []
+    for partido in fixture_completo:
+        # Para cada posible partido, se normaliza (ordena) y se comprueba si
+        # ya está en el set de partidos jugados.
+        if tuple(sorted(partido)) not in partidos_jugados_set:
+            # Si no se ha jugado, se añade a la lista de pendientes.
+            partidos_pendientes.append(partido)
+
+    return partidos_pendientes
+
+def generar_enfrentamientos_iniciales():
+    """
+    Genera los enfrentamientos para la primera fase eliminatoria (ej: Octavos de Final).
+
+    Esta función sigue la regla de negocio específica de un cruce entre zonas.
+    Primero, obtiene la tabla de posiciones final de cada zona. Luego, empareja
+    a los equipos según un esquema cruzado (ej: 1° de Zona A vs. último clasificado
+    de Zona B, 2° de Zona A vs. penúltimo de Zona B, y así sucesivamente).
+
+    Returns:
+        list or None: Una lista de tuplas con los enfrentamientos, o None si no
+                      hay suficientes equipos clasificados para generar los cruces.
+    """
+    logger.info("Generando enfrentamientos iniciales (Octavos de Final)...")
+    clasificados_por_zona = {}
+
+    # Itera sobre cada zona definida en el archivo de configuración.
+    for zona in config.ZONAS_DEL_TORNEO:
+        # Llama al método de la base de datos para obtener la tabla de posiciones
+        # ya calculada y ordenada para la zona actual.
+        tabla = database.db.calcular_tabla_posiciones(zona)
+
+        # Medida de seguridad: si no hay suficientes equipos en la tabla para
+        # cumplir con el número de clasificados, la lógica no puede continuar.
+        if len(tabla) < config.EQUIPOS_CLASIFICAN_POR_ZONA:
+            logger.error(f"No hay suficientes equipos en la Zona {zona} para clasificar.")
+            return None
+
+        # Extrae los nombres de los equipos que clasificaron.
+        # Se usa slicing `[:NUMERO]` para tomar solo los N primeros de la tabla.
+        clasificados_por_zona[zona] = [equipo['nombre'] for equipo in tabla[:config.EQUIPOS_CLASIFICAN_POR_ZONA]]
+        logger.debug(f"Clasificados de Zona {zona}: {clasificados_por_zona[zona]}")
+
+    # --- LÓGICA DE EMPAREJAMIENTO CRUZADO ---
+    # Esta es una regla de negocio específica para un torneo de 2 zonas.
+    # Si el torneo se expandiera a 4 zonas, esta sección necesitaría ser modificada.
+    if len(config.ZONAS_DEL_TORNEO) != 2:
+        logger.error("La lógica de emparejamiento actual solo soporta 2 zonas.")
+        return []
+
+    # Se extraen los nombres de las zonas y las listas de equipos para mayor claridad.
+    zona_a = config.ZONAS_DEL_TORNEO[0]
+    zona_b = config.ZONAS_DEL_TORNEO[1]
+    equipos_a = clasificados_por_zona[zona_a]
+    equipos_b = clasificados_por_zona[zona_b]
+
+    enfrentamientos = []
+    num_clasificados = config.EQUIPOS_CLASIFICAN_POR_ZONA
+
+    # Itera N veces, donde N es el número de equipos que clasifican por zona.
+    for i in range(num_clasificados):
+        # El equipo de la Zona A se toma en orden ascendente de clasificación.
+        # Para i=0, es el 1er clasificado (equipos_a[0]).
+        equipo_a = equipos_a[i]
+
+        # El equipo de la Zona B se toma en orden descendente de clasificación.
+        # La fórmula `(num_clasificados - 1) - i` logra el cruce:
+        # - Cuando i=0 (1° de A), se enfrenta a equipos_b[N-1] (el último clasificado de B).
+        # - Cuando i=1 (2° de A), se enfrenta a equipos_b[N-2] (el penúltimo de B).
+        equipo_b = equipos_b[(num_clasificados - 1) - i]
+
+        # Se crea la tupla del enfrentamiento y se añade a la lista.
+        enfrentamiento = (equipo_a, equipo_b)
+        enfrentamientos.append(enfrentamiento)
+        logger.debug(f"Enfrentamiento generado: {equipo_a} (Pos {i+1}{zona_a}) vs {equipo_b} (Pos {num_clasificados-i}{zona_b})")
+
+    return enfrentamientos
+
+def obtener_ganadores(fase_anterior):
+    """
+    Consulta la base de datos para obtener la lista de equipos ganadores de una fase.
+
+    Después de obtener la lista, la baraja aleatoriamente (`shuffle`) para que el
+    sorteo de la siguiente ronda sea imparcial y no dependa del orden en que
+    se jugaron o guardaron los partidos.
+
+    Args:
+        fase_anterior (str): El nombre de la fase de la cual obtener los ganadores
+                             (ej: "Octavos").
+
+    Returns:
+        list: Una lista con los nombres de los equipos ganadores, en orden aleatorio.
+    """
+    # Pide al módulo de base de datos todos los partidos de la fase especificada.
+    partidos = database.db.obtener_partidos_fase(fase_anterior)
+    ganadores = []
+
+    # Itera sobre cada partido recuperado.
+    for partido in partidos:
+        # Para cada partido, realiza una consulta para encontrar el nombre del equipo
+        # cuyo ID coincide con el 'ganador_id' del partido.
+        database.db.cursor.execute("SELECT e.nombre FROM partidos p JOIN equipos e ON p.ganador_id = e.id WHERE p.id = ?", (partido[0],))
+        ganador = database.db.cursor.fetchone()
+        if ganador:
+            ganadores.append(ganador[0])
+
+    # ¡Paso crucial! Se baraja la lista de ganadores. Esto asegura que los
+    # emparejamientos en la siguiente ronda (Cuartos, Semis) sean aleatorios.
+    random.shuffle(ganadores)
+    return ganadores
+
+def generar_enfrentamientos(fase_anterior):
+    """
+    Genera los enfrentamientos para las fases eliminatorias subsecuentes
+    (Cuartos, Semifinal, Final).
+
+    Esta función es más simple que la inicial. Llama a `obtener_ganadores` para
+    obtener una lista ya barajada de los equipos que avanzaron y simplemente
+    los empareja en el orden en que están en esa lista.
+
+    Args:
+        fase_anterior (str): El nombre de la fase de la cual provienen los
+                             ganadores (ej: "Octavos").
+
+    Returns:
+        list: Una lista de tuplas con los nuevos enfrentamientos.
+    """
+    # El primer paso es determinar quiénes avanzaron de la ronda anterior.
+    ganadores = obtener_ganadores(fase_anterior)
+
+    # Si hay menos de dos ganadores, no se pueden formar partidos.
+    if len(ganadores) < 2:
+        return []
+
+    enfrentamientos = []
+    # Se utiliza un bucle `range` con un paso de 2 para tomar a los ganadores
+    # de dos en dos (índices 0 y 1, luego 2 y 3, etc.).
+    for i in range(0, len(ganadores), 2):
+        # Se asegura de que haya un oponente para el equipo actual.
+        if i + 1 < len(ganadores):
+            # Se crea el par y se añade a la lista de enfrentamientos.
+            enfrentamientos.append((ganadores[i], ganadores[i+1]))
+
+    return enfrentamientos
+
+lib\config.py
+
+"""
+Módulo de Configuración
+
+Este archivo centraliza las constantes y parámetros de configuración de la
+aplicación. Permite modificar el comportamiento del programa fácilmente sin
+tener que cambiar la lógica principal.
+"""
+
+# --- CONFIGURACIÓN DE BOTONES DE PRUEBA ---
+# Establecer en True para mostrar los botones de "Autogenerar".
+# Establecer en False para ocultarlos en una versión "de producción".
+BOTONES_PRUEBA_VISIBLES = True
+
+# --- CONFIGURACIÓN DE LA ESTRUCTURA DEL TORNEO ---
+# Define los nombres de las zonas/grupos. Puedes tener 2, 4, 8...
+# Ejemplo para 4 zonas: ZONAS_DEL_TORNEO = ["A", "B", "C", "D"]
+ZONAS_DEL_TORNEO = ["A", "B"]
+
+# Define cuántos equipos por zona clasifican a la fase eliminatoria.
+# El total de clasificados debe ser una potencia de 2 (4, 8, 16, 32...).
+# Total = len(ZONAS_DEL_TORNEO) * EQUIPOS_CLASIFICAN_POR_ZONA
+EQUIPOS_CLASIFICAN_POR_ZONA = 8
+
+# Define el número máximo de equipos permitidos por zona.
+# Esto previene que se agreguen equipos de más en la fase de gestión.
+# Un valor común es el doble de los que clasifican.
+MAX_EQUIPOS_POR_ZONA = EQUIPOS_CLASIFICAN_POR_ZONA * 2
+
+# --- CONFIGURACIÓN DE LOGGING ---
+# Establecer en True para mostrar logs detallados en la terminal.
+# Establecer en False para una operación más silenciosa.
+LOGGING_ACTIVADO = True
+
+# --- CONFIGURACIÓN VISUAL ---
+# Establecer en True para que los escudos de los equipos en las fases
+# eliminatorias se muestren con el color único de cada equipo.
+# Si es False, los escudos no se mostraran
+ESCUDOS_VISIBLES = True
+
+lib\database.py
+
+"""
+Módulo de Base de Datos (Capa de Persistencia)
+
+Este archivo centraliza toda la interacción con la base de datos SQLite3.
+Actúa como una capa de abstracción, de modo que el resto de la aplicación
+(GUI, lógica) no necesita conocer el lenguaje SQL ni los detalles de cómo
+se almacenan los datos. Simplemente llaman a los métodos de esta clase.
+
+Responsabilidades principales:
+- Establecer y cerrar la conexión con el archivo de la base de datos.
+- Definir y crear el esquema de la base de datos (tablas y columnas).
+- Proveer métodos para las operaciones CRUD (Crear, Leer, Actualizar, Borrar)
+  sobre equipos, partidos y configuraciones.
+- Contener la lógica compleja de consulta, como el cálculo de la tabla de posiciones.
+"""
+
+# Se importa 'sqlite3' para la interacción con la base de datos.
+import sqlite3
+
+# Se importa 'random' para la generación de colores hexadecimales únicos.
+import random
+
+# Se importa 'atexit' para registrar una función que se ejecutará automáticamente
+# cuando el programa esté a punto de finalizar. Se usa para garantizar que la
+# conexión a la base de datos siempre se cierre correctamente.
+import atexit
+
+# Se importa el logger para registrar eventos importantes de la base de datos.
+from .logger import logger
+
+# Constante que define el nombre del archivo de la base de datos.
+# Centralizarlo aquí facilita cambiarlo si fuera necesario.
+DB_NAME = "torneo.sqlite3"
+
+
+# --- Clase Principal de la Base de Datos ---
+class Database:
+    """
+    Gestiona la conexión y todas las operaciones con la base de datos del torneo.
+    Esta clase sigue el patrón Singleton (a través de la instancia única 'db'
+    creada al final del archivo), asegurando que toda la aplicación comparta
+    la misma conexión a la base de datos.
+    """
+
+    def __init__(self, db_name=DB_NAME):
+        """
+        Constructor de la clase. Establece la conexión con la base de datos.
+
+        Al instanciar esta clase, se conecta al archivo SQLite especificado
+        (creándolo si no existe), obtiene un 'cursor' para ejecutar comandos,
+        y llama al método que asegura que las tablas necesarias existan.
+        También registra el método de cierre para que se ejecute al salir.
+
+        Args:
+            db_name (str): El nombre del archivo de la base de datos.
+                           Permite especificar un nombre diferente para los tests
+                           (ej: ':memory:' para una base de datos en RAM).
+        """
+        try:
+            # Establece la conexión con el archivo de la base de datos.
+            self.conn = sqlite3.connect(db_name)
+            # Crea un objeto cursor, que es el que ejecuta las sentencias SQL.
+            self.cursor = self.conn.cursor()
+            # Llama al método para crear las tablas si no existen.
+            self.crear_tablas()
+
+            # Registra 'cerrar_conexion' para que se llame automáticamente al
+            # finalizar el programa, evitando conexiones abiertas.
+            atexit.register(self.cerrar_conexion)
+            logger.info("Conexión a la base de datos establecida.")
+        except Exception as e:
+            # Si ocurre cualquier error durante la conexión, se registra como
+            # crítico y se relanza la excepción para detener el programa.
+            logger.critical(f"No se pudo conectar a la base de datos: {e}")
+            raise e
+
+    def cerrar_conexion(self):
+        """
+        Cierra la conexión activa con la base de datos.
+        Es importante cerrar la conexión para liberar recursos y asegurar que
+        todos los cambios se guarden correctamente en el archivo.
+        """
+        # Se comprueba si el objeto de conexión existe antes de intentar cerrarlo.
+        if self.conn:
+            self.conn.close()
+            logger.info("Conexión a la base de datos cerrada.")
+
+    def crear_tablas(self):
+        """
+        Define y ejecuta las sentencias SQL para crear el esquema de la base de datos.
+        Utiliza "CREATE TABLE IF NOT EXISTS" para que solo se ejecute la primera
+        vez o si el archivo de la base de datos es eliminado.
+        """
+        # --- Tabla de Equipos ---
+        # Almacena la información de cada equipo participante.
+        # - id: Clave primaria autoincremental, única para cada equipo.
+        # - nombre: Nombre del equipo, debe ser único (UNIQUE).
+        # - zona: Grupo al que pertenece el equipo (ej: "A").
+        # - color_hex: Un color hexadecimal único para la UI.
+        self.cursor.execute("""
+        CREATE TABLE IF NOT EXISTS equipos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nombre TEXT NOT NULL UNIQUE,
+            zona TEXT NOT NULL,
+            color_hex TEXT NOT NULL UNIQUE
+        )
+        """)
+
+        # --- Tabla de Partidos ---
+        # Almacena cada partido jugado en el torneo.
+        # - fase: Etapa del torneo (ej: "Grupo", "Octavos").
+        # - equipo_local/visitante_id: Claves foráneas que referencian el 'id' de la tabla 'equipos'.
+        # - ganador_id: También referencia el 'id' de la tabla 'equipos'. Es NULL en caso de empate.
+        self.cursor.execute("""
+        CREATE TABLE IF NOT EXISTS partidos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            fase TEXT NOT NULL,
+            equipo_local_id INTEGER,
+            equipo_visitante_id INTEGER,
+            goles_local INTEGER,
+            goles_visitante INTEGER,
+            ganador_id INTEGER,
+            FOREIGN KEY (equipo_local_id) REFERENCES equipos (id),
+            FOREIGN KEY (equipo_visitante_id) REFERENCES equipos (id),
+            FOREIGN KEY (ganador_id) REFERENCES equipos (id)
+        )
+        """)
+
+        # --- Tabla de Configuración ---
+        # Almacena pares de llave-valor para guardar el estado del torneo.
+        # - llave: El nombre de la configuración (ej: 'equipos_bloqueados').
+        # - valor: El valor de esa configuración.
+        self.cursor.execute("""
+        CREATE TABLE IF NOT EXISTS config (
+            llave TEXT PRIMARY KEY,
+            valor TEXT NOT NULL
+        )""")
+
+        # Confirma y guarda todos los cambios realizados en esta transacción.
+        self.conn.commit()
+        logger.debug("Estructura de la base de datos verificada/creada.")
+
+    def borrar_todos_los_datos(self):
+        """
+        Elimina todos los registros de todas las tablas. Es una operación
+        destructiva utilizada para reiniciar el torneo por completo.
+        """
+        logger.warning("Iniciando borrado total de la base de datos...")
+        # Se usan sentencias DELETE sin WHERE para borrar todo el contenido.
+        self.cursor.execute("DELETE FROM partidos")
+        self.cursor.execute("DELETE FROM equipos")
+        self.cursor.execute("DELETE FROM config")
+        self.conn.commit()
+        logger.info("Todos los datos han sido eliminados de la base de datos.")
+
+    def obtener_config(self, llave, valor_por_defecto=None):
+        """
+        Obtiene un valor de la tabla de configuración.
+
+        Args:
+            llave (str): La configuración a buscar.
+            valor_por_defecto: El valor a devolver si la llave no se encuentra.
+
+        Returns:
+            str or None: El valor encontrado o el valor por defecto.
+        """
+        self.cursor.execute("SELECT valor FROM config WHERE llave = ?", (llave,))
+        resultado = self.cursor.fetchone()
+        # El operador ternario devuelve el primer elemento de la tupla si
+        # `resultado` no es None, de lo contrario devuelve `valor_por_defecto`.
+        return resultado[0] if resultado else valor_por_defecto
+
+    def establecer_config(self, llave, valor):
+        """
+        Guarda o actualiza un valor en la tabla de configuración.
+        Utiliza "INSERT OR REPLACE" que inserta una nueva fila si la llave
+        no existe, o reemplaza la fila existente si ya existe.
+
+        Args:
+            llave (str): La configuración a establecer.
+            valor (any): El valor a guardar (se convierte a string).
+        """
+        self.cursor.execute("INSERT OR REPLACE INTO config (llave, valor) VALUES (?, ?)", (llave, str(valor)))
+        self.conn.commit()
+        logger.info(f"Configuración actualizada: '{llave}' = '{valor}'")
+
+    # --- Métodos de conveniencia para configuraciones comunes ---
+    def fase_grupos_bloqueada(self):
+        """Comprueba si la fase de grupos está bloqueada, devolviendo True o False."""
+        return self.obtener_config('fase_grupos_bloqueada') == '1'
+
+    def equipos_bloqueados(self):
+        """Comprueba si la gestión de equipos está bloqueada, devolviendo True o False."""
+        return self.obtener_config('equipos_bloqueados') == '1'
+
+    def _generar_color_unico(self):
+        """
+        Genera un color hexadecimal aleatorio y verifica que no esté ya en uso.
+        El prefijo '_' indica que es un método "privado", pensado para ser
+        usado solo por otros métodos dentro de esta misma clase.
+        """
+        while True:
+            # Genera un color aleatorio en formato #RRGGBB.
+            color = f"#{random.randint(0, 0xFFFFFF):06x}"
+            # Consulta la base de datos para ver si este color ya existe.
+            self.cursor.execute("SELECT id FROM equipos WHERE color_hex = ?", (color,))
+            # Si `fetchone()` devuelve None, significa que el color no se encontró y es único.
+            if self.cursor.fetchone() is None:
+                return color
+
+    def agregar_equipo(self, nombre, zona):
+        """
+        Inserta un nuevo equipo en la base de datos con un color único.
+        Maneja posibles errores de integridad (nombres duplicados).
+
+        Returns:
+            bool: True si el equipo se agregó con éxito, False en caso contrario.
+        """
+        try:
+            # Primero, obtiene un color que no esté repetido.
+            color = self._generar_color_unico()
+            # Ejecuta la inserción.
+            self.cursor.execute("INSERT INTO equipos (nombre, zona, color_hex) VALUES (?, ?, ?)", (nombre, zona, color))
+            self.conn.commit()
+            logger.info(f"Equipo '{nombre}' agregado a Zona '{zona}' con color {color}.")
+            return True
+        except sqlite3.IntegrityError:
+            # Este bloque se ejecuta si la inserción viola una restricción
+            # UNIQUE (en este caso, el nombre del equipo).
+            logger.error(f"Error al agregar: El equipo '{nombre}' ya existe.")
+            return False
+
+    def obtener_equipos(self):
+        """Obtiene una lista de todos los equipos, ordenados por zona y nombre."""
+        self.cursor.execute("SELECT id, nombre, zona, color_hex FROM equipos ORDER BY zona, nombre")
+        return self.cursor.fetchall()
+
+    def eliminar_equipo(self, equipo_id):
+        """Elimina un equipo de la base de datos usando su ID."""
+        self.cursor.execute("DELETE FROM equipos WHERE id = ?", (equipo_id,))
+        self.conn.commit()
+        logger.info(f"Equipo con ID '{equipo_id}' eliminado.")
+
+    def actualizar_equipo(self, equipo_id, nuevo_nombre, nueva_zona):
+        """
+        Actualiza el nombre y la zona de un equipo existente.
+        Maneja errores si el nuevo nombre ya está en uso.
+
+        Returns:
+            bool: True si la actualización fue exitosa, False si no.
+        """
+        try:
+            self.cursor.execute("UPDATE equipos SET nombre = ?, zona = ? WHERE id = ?", (nuevo_nombre, nueva_zona, equipo_id))
+            self.conn.commit()
+            logger.info(f"Equipo con ID '{equipo_id}' actualizado a: Nombre='{nuevo_nombre}', Zona='{nueva_zona}'.")
+            return True
+        except sqlite3.IntegrityError:
+            logger.error(f"Error al actualizar: El nombre '{nuevo_nombre}' ya está en uso.")
+            return False
+
+    def registrar_partido(self, fase, equipo_local_id, equipo_visitante_id, goles_local, goles_visitante):
+        """
+        Guarda el resultado de un partido en la base de datos.
+        Calcula automáticamente el ID del ganador basado en los goles.
+        """
+        ganador_id = None  # Por defecto, es un empate.
+        if goles_local > goles_visitante:
+            ganador_id = equipo_local_id
+        elif goles_visitante > goles_local:
+            ganador_id = equipo_visitante_id
+
+        self.cursor.execute("""
+        INSERT INTO partidos (fase, equipo_local_id, equipo_visitante_id, goles_local, goles_visitante, ganador_id)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """, (fase, equipo_local_id, equipo_visitante_id, goles_local, goles_visitante, ganador_id))
+        self.conn.commit()
+        logger.info(f"Partido de '{fase}' registrado: ID_Local={equipo_local_id} vs ID_Visitante={equipo_visitante_id} ({goles_local}-{goles_visitante}).")
+
+    def obtener_partido_por_equipos(self, fase, local_id, visitante_id):
+        """
+        Busca un partido específico entre dos equipos en una fase determinada.
+        Útil para saber si un partido ya ha sido jugado.
+        """
+        # La cláusula WHERE comprueba ambas combinaciones de localía.
+        self.cursor.execute("""
+            SELECT id, goles_local, goles_visitante FROM partidos
+            WHERE fase = ? AND ((equipo_local_id = ? AND equipo_visitante_id = ?) OR (equipo_local_id = ? AND equipo_visitante_id = ?))
+        """, (fase, local_id, visitante_id, visitante_id, local_id))
+        return self.cursor.fetchone()
+
+    def actualizar_partido(self, partido_id, goles_local, goles_visitante, ganador_id):
+        """Actualiza el resultado de un partido que ya existe en la base de datos."""
+        self.cursor.execute("""
+            UPDATE partidos SET goles_local = ?, goles_visitante = ?, ganador_id = ?
+            WHERE id = ?
+        """, (goles_local, goles_visitante, ganador_id, partido_id))
+        self.conn.commit()
+        logger.info(f"Resultado del partido ID '{partido_id}' actualizado a {goles_local}-{goles_visitante}.")
+
+    def obtener_partidos_fase(self, fase):
+        """
+        Obtiene una lista de todos los partidos jugados en una fase específica,
+        incluyendo los nombres de los equipos en lugar de solo sus IDs.
+        """
+        # Se utilizan JOINs para cruzar la tabla de partidos con la de equipos
+        # (dos veces, una para el local y otra para el visitante).
+        self.cursor.execute("""
+        SELECT p.id, el.nombre, ev.nombre, p.goles_local, p.goles_visitante
+        FROM partidos p
+        JOIN equipos el ON p.equipo_local_id = el.id
+        JOIN equipos ev ON p.equipo_visitante_id = ev.id
+        WHERE p.fase = ?
+        """, (fase,))
+        return self.cursor.fetchall()
+
+    def reiniciar_fase_grupos(self):
+        """Borra únicamente los partidos pertenecientes a la fase de grupos."""
+        self.cursor.execute("DELETE FROM partidos WHERE fase = 'Grupo'")
+        self.conn.commit()
+        logger.warning("Resultados de la fase de grupos han sido reiniciados.")
+
+    def reiniciar_fases_eliminatorias(self):
+        """Borra únicamente los partidos que NO pertenecen a la fase de grupos."""
+        # Esta consulta elimina todos los registros de la tabla 'partidos'
+        # cuya fase sea diferente a 'Grupo', reseteando así Octavos, Cuartos, etc.
+        self.cursor.execute("DELETE FROM partidos WHERE fase != 'Grupo'")
+        self.conn.commit()
+        logger.warning("Resultados de las fases eliminatorias han sido reiniciados.")
+
+    def calcular_tabla_posiciones(self, zona):
+        """
+        Calcula y devuelve la tabla de posiciones completa para una zona.
+        Este es el método más complejo, ya que realiza múltiples consultas a la
+        base de datos para agregar los datos de cada equipo.
+
+        Args:
+            zona (str): La zona para la cual se calculará la tabla.
+
+        Returns:
+            list: Una lista de diccionarios, donde cada diccionario representa
+                  una fila de la tabla de posiciones para un equipo.
+        """
+        # 1. Obtener todos los equipos de la zona.
+        self.cursor.execute("SELECT id, nombre FROM equipos WHERE zona = ?", (zona,))
+        equipos = self.cursor.fetchall()
+        tabla = []
+
+        # 2. Iterar sobre cada equipo para calcular sus estadísticas.
+        for equipo_id, nombre_equipo in equipos:
+            # Partidos Jugados (PJ)
+            self.cursor.execute("SELECT COUNT(*) FROM partidos WHERE (equipo_local_id = ? OR equipo_visitante_id = ?) AND fase = 'Grupo'", (equipo_id, equipo_id))
+            pj = self.cursor.fetchone()[0]
+            # Partidos Ganados (PG)
+            self.cursor.execute("SELECT COUNT(*) FROM partidos WHERE ganador_id = ? AND fase = 'Grupo'", (equipo_id,))
+            pg = self.cursor.fetchone()[0]
+            # Partidos Empatados (PE)
+            self.cursor.execute("SELECT COUNT(*) FROM partidos WHERE (equipo_local_id = ? OR equipo_visitante_id = ?) AND goles_local = goles_visitante AND fase = 'Grupo'", (equipo_id, equipo_id))
+            pe = self.cursor.fetchone()[0]
+            # Partidos Perdidos (PP) se calcula a partir de los otros valores.
+            pp = pj - pg - pe
+            # Goles a Favor (GF)
+            self.cursor.execute("SELECT SUM(goles_local) FROM partidos WHERE equipo_local_id = ? AND fase = 'Grupo'", (equipo_id,))
+            gf_local = self.cursor.fetchone()[0] or 0 # 'or 0' para manejar casos de SUM sobre 0 filas (que devuelve None)
+            self.cursor.execute("SELECT SUM(goles_visitante) FROM partidos WHERE equipo_visitante_id = ? AND fase = 'Grupo'", (equipo_id,))
+            gf_visitante = self.cursor.fetchone()[0] or 0
+            gf = gf_local + gf_visitante
+            # Goles en Contra (GC)
+            self.cursor.execute("SELECT SUM(goles_visitante) FROM partidos WHERE equipo_local_id = ? AND fase = 'Grupo'", (equipo_id,))
+            gc_local = self.cursor.fetchone()[0] or 0
+            self.cursor.execute("SELECT SUM(goles_local) FROM partidos WHERE equipo_visitante_id = ? AND fase = 'Grupo'", (equipo_id,))
+            gc_visitante = self.cursor.fetchone()[0] or 0
+            gc = gc_local + gc_visitante
+            # Diferencia de Goles (DG)
+            dg = gf - gc
+            # Puntos (3 por victoria, 1 por empate)
+            puntos = (pg * 3) + pe
+
+            # 3. Construir un diccionario con todas las estadísticas del equipo.
+            tabla.append({
+                "nombre": nombre_equipo, "pj": pj, "pg": pg, "pe": pe, "pp": pp,
+                "gf": gf, "gc": gc, "dg": dg, "puntos": puntos
+            })
+
+        # 4. Ordenar la tabla según los criterios de desempate.
+        #    Se ordena primero por Puntos, luego por Diferencia de Goles, y finalmente
+        #    por Goles a Favor. `reverse=True` para que sea de mayor a menor.
+        tabla.sort(key=lambda x: (x['puntos'], x['dg'], x['gf']), reverse=True)
+        return tabla
+
+# --- Instancia Única (Singleton) ---
+# Se crea una única instancia de la clase Database cuando este módulo es importado.
+# El resto de la aplicación (gui.py, logic.py) importará esta variable 'db'
+# para asegurarse de que todos los componentes compartan la misma conexión.
+db = Database()
+
+lib\widgets.py
+
+"""
+Módulo de Widgets Personalizados (Componentes Reutilizables de GUI)
+
+Este archivo contiene clases que extienden la funcionalidad base de Tkinter
+para crear componentes de interfaz gráfica (widgets) a medida. El objetivo
+principal es encapsular funcionalidades complejas y repetitivas de la GUI
+en clases autocontenidas y reutilizables.
+
+Esto sigue el principio de "No te repitas" (Don't Repeat Yourself - DRY)
+y ayuda a que el código del módulo principal de la GUI (`gui.py`) sea
+mucho más limpio, legible y fácil de mantener, ya que puede instanciar
+estos widgets complejos con una sola línea de código.
+
+Widgets definidos:
+- Tooltip: Una clase que añade mensajes emergentes (tooltips) a cualquier widget.
+- CollapsibleFrame: Un widget de tipo "acordeón" que puede mostrar y ocultar
+  su contenido, ideal para organizar la información verticalmente.
+"""
+
+# Se importa la librería `tkinter` completa como 'tk' para los componentes base.
+import tkinter as tk
+
+# Se importa el submódulo `ttk` que contiene los widgets temáticos y de
+# apariencia más moderna.
+from tkinter import ttk
+
+
+# --- Clase Auxiliar para Crear Tooltips ---
+class Tooltip:
+    """
+    Crea un mensaje emergente (tooltip) para un widget de Tkinter.
+
+    Esta clase no es un widget en sí misma, sino una clase "ayudante" que se
+    asocia a un widget existente. Se encarga de escuchar los eventos del ratón
+    (cuando entra y sale del área del widget) para mostrar y ocultar una pequeña
+    ventana con texto informativo.
+    """
+
+    def __init__(self, widget, text):
+        """
+        Inicializa el tooltip y lo asocia a un widget.
+
+        Args:
+            widget (tk.Widget): El widget al cual se le añadirá el tooltip.
+            text (str): El texto que se mostrará en el mensaje emergente.
+        """
+        # Guarda una referencia al widget "padre" y al texto.
+        self.widget = widget
+        self.text = text
+        self.tooltip_window = None  # Inicialmente, no hay ninguna ventana de tooltip.
+
+        # --- Manejo de Eventos ---
+        # `bind` asocia un evento a una función (callback).
+        # Cuando el cursor del ratón entra en el área del widget, se llama a `show_tooltip`.
+        self.widget.bind("<Enter>", self.show_tooltip)
+        # Cuando el cursor del ratón sale del área del widget, se llama a `hide_tooltip`.
+        self.widget.bind("<Leave>", self.hide_tooltip)
+
+    def show_tooltip(self, event):
+        """
+
+        Crea y muestra la ventana del tooltip cerca del cursor del ratón.
+        Esta función es el "callback" que se ejecuta con el evento <Enter>.
+
+        Args:
+            event: El objeto de evento de Tkinter (no se usa directamente,
+                   pero es requerido por la firma de la función `bind`).
+        """
+        # Pide al widget las coordenadas de su "caja" (bounding box).
+        x, y, _, _ = self.widget.bbox("insert")
+        # Convierte las coordenadas locales del widget a coordenadas globales de la pantalla.
+        x += self.widget.winfo_rootx() + 25
+        y += self.widget.winfo_rooty() + 25
+
+        # Crea una nueva ventana de nivel superior (`Toplevel`), que es una
+        # ventana independiente sin los controles estándar (minimizar, cerrar, etc.).
+        self.tooltip_window = tk.Toplevel(self.widget)
+        # `wm_overrideredirect(True)` elimina los bordes y la barra de título de la ventana.
+        self.tooltip_window.wm_overrideredirect(True)
+        # Posiciona la ventana en las coordenadas calculadas.
+        self.tooltip_window.wm_geometry(f"+{x}+{y}")
+
+        # Crea una etiqueta (Label) dentro de la ventana del tooltip para mostrar el texto.
+        label = tk.Label(self.tooltip_window, text=self.text, justify='left',
+                         background="#ffffe0", relief='solid', borderwidth=1,
+                         font=("tahoma", "8", "normal"))
+        label.pack(ipadx=1)
+
+    def hide_tooltip(self, event):
+        """
+        Destruye la ventana del tooltip.
+        Esta función es el "callback" que se ejecuta con el evento <Leave>.
+        """
+        # Si la ventana del tooltip existe, destrúyela.
+        if self.tooltip_window:
+            self.tooltip_window.destroy()
+        # Restablece la variable a None para indicar que ya no hay un tooltip visible.
+        self.tooltip_window = None
+
+
+# --- Widget Personalizado: Frame Colapsable (Acordeón) ---
+class CollapsibleFrame(ttk.Frame):
+    """
+    Un widget que consiste en un Frame de `ttk` que puede ser expandido o
+    colapsado por el usuario haciendo clic en un botón en su cabecera.
+
+    Hereda de `ttk.Frame`, por lo que se puede usar como cualquier otro frame
+    para contener otros widgets. La diferencia es que encapsula la lógica
+    para mostrar u ocultar su contenido.
+    """
+
+    def __init__(self, parent, text="", expanded=True):
+        """
+        Inicializa el Frame colapsable.
+
+        Args:
+            parent (tk.Widget): El widget maestro que contendrá este frame.
+            text (str): El texto del título que aparecerá en la cabecera.
+            expanded (bool): El estado inicial del widget (expandido o colapsado).
+        """
+        # Llama al constructor de la clase padre (ttk.Frame).
+        super().__init__(parent)
+
+        # Guarda las propiedades iniciales.
+        self.text = text
+        self._expanded = expanded  # Se usa '_' para indicar que es una variable "privada".
+
+        # --- Construcción de la Cabecera ---
+        # La cabecera es un frame interno que contiene el botón de despliegue y el título.
+        self.header_frame = ttk.Frame(self)
+        self.header_frame.pack(fill="x", expand=True, pady=(0, 2))
+
+        # El botón de despliegue (toggle) muestra una flecha que cambia de dirección.
+        # Su `command` está asociado al método `toggle` de esta misma clase.
+        self.toggle_button = ttk.Button(self.header_frame, text="▼" if expanded else "▶",
+                                        width=3, command=self.toggle)
+        self.toggle_button.pack(side="left")
+
+        # La etiqueta que muestra el título del frame.
+        ttk.Label(self.header_frame, text=self.text, font=("Arial", 10, "bold")).pack(side="left", padx=5)
+
+        # --- Construcción del Contenedor ---
+        # Este es el frame que se mostrará u ocultará.
+        # Otros widgets (botones, etiquetas, etc.) se deben añadir a ESTE `container`,
+        # no directamente al `CollapsibleFrame`.
+        self.container = ttk.Frame(self, style='Content.TFrame', padding=10)
+
+        # Si el estado inicial es expandido, se muestra el contenedor.
+        if self._expanded:
+            self.container.pack(fill="x", expand=True, padx=5, pady=(0, 5))
+
+    def toggle(self):
+        """
+        Cambia el estado del frame entre expandido y colapsado.
+        Este método es llamado por el `toggle_button`.
+        """
+        # Si el frame está actualmente expandido, lo colapsamos.
+        if self._expanded:
+            # `pack_forget()` oculta el widget sin destruirlo, manteniendo su
+            # estado y contenido para cuando se vuelva a mostrar.
+            self.container.pack_forget()
+            # Cambia el texto del botón para indicar la acción de expandir.
+            self.toggle_button.configure(text="▶")
+        # Si el frame está actualmente colapsado, lo expandimos.
+        else:
+            # `pack()` vuelve a mostrar el widget en la ventana.
+            self.container.pack(fill="x", expand=True, padx=5, pady=(0, 5))
+            # Cambia el texto del botón para indicar la acción de colapsar.
+            self.toggle_button.configure(text="▼")
+
+        # Invierte el valor booleano del estado.
+        self._expanded = not self._expanded
+
+lib\logger.py
+
+"""
+Módulo de Configuración de Logging
+
+Este archivo se encarga de una única tarea: configurar y proporcionar una
+instancia centralizada del sistema de registro (logger) para toda la aplicación.
+El uso de un logger es una práctica recomendada sobre el uso de `print()`
+para la depuración, ya que permite:
+
+- Asignar niveles de severidad a los mensajes (DEBUG, INFO, WARNING, ERROR).
+- Formatear la salida de manera consistente.
+- Activar o desactivar fácilmente toda la salida de depuración desde un
+  único punto (el archivo de configuración).
+
+La librería `colorlog` se utiliza para mejorar la legibilidad de los logs en
+la terminal, asignando colores a cada nivel de severidad.
+"""
+
+# Se importa el módulo `logging` estándar de Python.
+import logging
+
+# Se importa `colorlog`, una librería externa que extiende `logging` para
+# añadir color a la salida de la consola.
+import colorlog
+
+# Se importa el módulo de configuración para poder leer si el logging
+# debe estar activado o no.
+from . import config
+
+
+def configurar_logger():
+    """
+    Crea, configura y devuelve un objeto logger para la aplicación.
+
+    Esta función es el núcleo de la configuración. Comprueba el valor de
+    `LOGGING_ACTIVADO` en el archivo `config.py`.
+    - Si es `True`, configura un logger que imprime mensajes coloridos en la
+      consola para todos los niveles a partir de DEBUG.
+    - Si es `False`, configura un logger "silencioso" que no realiza ninguna
+      acción, evitando así cualquier salida en la consola en un entorno de
+      producción.
+
+    Returns:
+        logging.Logger: La instancia del logger configurada.
+    """
+    # Obtiene (o crea si no existe) un logger con el nombre "torneo_app".
+    # Usar un nombre específico permite que toda la app comparta el mismo logger.
+    log = logging.getLogger("torneo_app")
+
+    # Condición principal: solo se configura el handler si el logging está
+    # activado Y si el logger no tiene ya handlers configurados (esto evita
+    # añadir handlers duplicados si la función se llamara varias veces).
+    if config.LOGGING_ACTIVADO and not log.handlers:
+        # Establece el nivel mínimo de severidad que el logger procesará.
+        # `logging.DEBUG` es el nivel más bajo, por lo que capturará todo.
+        log.setLevel(logging.DEBUG)
+
+        # Crea un 'handler', que es el responsable de enviar los registros
+        # a un destino. `StreamHandler` lo envía a la consola (terminal).
+        handler = colorlog.StreamHandler()
+
+        # Define el formato de cada línea de log.
+        # - `%(log_color)s`: Inyecta el código de color para el nivel del mensaje.
+        # - `%(levelname)-8s`: El nombre del nivel (ej: "INFO"), alineado a 8 caracteres.
+        # - `%(reset)s`: Restablece el color.
+        # - `%(blue)s%(message)s`: El mensaje del log en color azul.
+        formatter = colorlog.ColoredFormatter(
+            '%(log_color)s%(levelname)-8s%(reset)s %(blue)s%(message)s',
+            # Mapea cada nivel de log a un color específico.
+            log_colors={
+                'DEBUG':    'cyan',
+                'INFO':     'green',
+                'WARNING':  'yellow',
+                'ERROR':    'red',
+                'CRITICAL': 'red,bg_white',
+            }
+        )
+
+        # Asocia el formateador al handler.
+        handler.setFormatter(formatter)
+        # Asocia el handler al logger.
+        log.addHandler(handler)
+
+    # Si el logging está explícitamente desactivado en el archivo de configuración.
+    elif not config.LOGGING_ACTIVADO:
+        # Se añade un `NullHandler`, que es un "agujero negro" para los logs.
+        # Recibe los mensajes de log pero no hace nada con ellos. Esto es más
+        # eficiente que llenar el código de `if config.LOGGING_ACTIVADO:`
+        # antes de cada llamada al logger.
+        log.addHandler(logging.NullHandler())
+
+    # Devuelve la instancia del logger, ya sea configurada o silenciosa.
+    return log
+
+# --- Instancia Única (Singleton) ---
+# Se llama a la función de configuración UNA SOLA VEZ, cuando este módulo es
+# importado por primera vez.
+# La instancia resultante se guarda en la variable 'logger'.
+# Otros módulos (gui.py, database.py, etc.) importarán esta variable
+# para usar el mismo logger configurado en toda la aplicación.
+logger = configurar_logger()
+
