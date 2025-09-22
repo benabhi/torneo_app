@@ -103,7 +103,7 @@ El código está organizado de forma modular para facilitar su mantenimiento y e
 │   ├── test_database.py                # Tests para la capa de base de datos
 │   ├── test_gui.py                     # Tests para la lógica de la interfaz
 │   └── test_logic.py                   # Tests para las reglas del torneo
-├── Docs/                               # Documentación varia
+├── docs/                               # Documentación varia
 │   ├── Wireframe - Fase X.png.py       # Archivos de imagen de los wireframes de la app
 │   ├── database.sql                    # Código SQL para crear la base de datos
 │   ├── diagrama_flujo.svg              # Diagrama de flujo de la app (imagen svg)
