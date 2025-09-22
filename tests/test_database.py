@@ -177,3 +177,61 @@ def test_reiniciar_fases_eliminatorias_mantiene_grupos(db_test):
     assert len(partidos_restantes) == 1
     # Y ese partido debe ser el de la fase de "Grupo".
     assert partidos_restantes[0][1] == "Grupo"
+
+def test_eliminar_todos_los_equipos_mantiene_config(db_test):
+    """
+    Verifica que `eliminar_todos_los_equipos` borra equipos y partidos
+    pero deja intacta la tabla de configuración.
+    """
+    # Arrange: Añade equipos, un partido y una clave de configuración.
+    db_test.agregar_equipo("Equipo A", "A")
+    db_test.agregar_equipo("Equipo B", "B")
+    equipos = db_test.obtener_equipos()
+    db_test.registrar_partido("Grupo", equipos[0][0], equipos[1][0], 1, 1)
+    db_test.establecer_config("test_key", "test_value")
+
+    # Act: Llama al método de eliminación.
+    db_test.eliminar_todos_los_equipos()
+
+    # Assert: Verifica que los equipos y partidos se han ido, pero la config permanece.
+    assert len(db_test.obtener_equipos()) == 0
+    assert len(db_test.cursor.execute("SELECT * FROM partidos").fetchall()) == 0
+    assert db_test.obtener_config("test_key") == "test_value"
+
+def test_desbloquear_equipos_elimina_config(db_test):
+    """
+    Verifica que los métodos `desbloquear_*` eliminan la clave correspondiente
+    de la tabla de configuración.
+    """
+    # Arrange: Establece las claves de bloqueo.
+    db_test.establecer_config('equipos_bloqueados', '1')
+    db_test.establecer_config('fase_grupos_bloqueada', '1')
+    assert db_test.equipos_bloqueados() is True
+    assert db_test.fase_grupos_bloqueada() is True
+
+    # Act: Llama a los métodos de desbloqueo.
+    db_test.desbloquear_equipos()
+    db_test.desbloquear_fase_grupos()
+
+    # Assert: Verifica que las claves ya no existen.
+    assert db_test.equipos_bloqueados() is False
+    assert db_test.fase_grupos_bloqueada() is False
+
+def test_on_delete_cascade_funciona(db_test):
+    """
+    Verifica que al eliminar un equipo, sus partidos asociados se eliminan
+    automáticamente gracias a la restricción `ON DELETE CASCADE`.
+    """
+    # Arrange: Crea dos equipos y un partido entre ellos.
+    db_test.agregar_equipo("Equipo A", "A")
+    db_test.agregar_equipo("Equipo B", "A")
+    equipos = db_test.obtener_equipos()
+    id_a, id_b = equipos[0][0], equipos[1][0]
+    db_test.registrar_partido("Grupo", id_a, id_b, 1, 0)
+    assert len(db_test.obtener_partidos_fase("Grupo")) == 1
+
+    # Act: Elimina uno de los equipos.
+    db_test.eliminar_equipo(id_a)
+
+    # Assert: Verifica que el partido también ha sido eliminado.
+    assert len(db_test.obtener_partidos_fase("Grupo")) == 0

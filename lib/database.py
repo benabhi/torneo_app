@@ -61,6 +61,8 @@ class Database:
             self.conn = sqlite3.connect(db_name)
             # Crea un objeto cursor, que es el que ejecuta las sentencias SQL.
             self.cursor = self.conn.cursor()
+            # Habilitar soporte para claves foráneas, que por defecto está desactivado en sqlite3
+            self.cursor.execute("PRAGMA foreign_keys = ON")
             # Llama al método para crear las tablas si no existen.
             self.crear_tablas()
 
@@ -120,9 +122,9 @@ class Database:
             goles_local INTEGER,
             goles_visitante INTEGER,
             ganador_id INTEGER,
-            FOREIGN KEY (equipo_local_id) REFERENCES equipos (id),
-            FOREIGN KEY (equipo_visitante_id) REFERENCES equipos (id),
-            FOREIGN KEY (ganador_id) REFERENCES equipos (id)
+            FOREIGN KEY (equipo_local_id) REFERENCES equipos (id) ON DELETE CASCADE,
+            FOREIGN KEY (equipo_visitante_id) REFERENCES equipos (id) ON DELETE CASCADE,
+            FOREIGN KEY (ganador_id) REFERENCES equipos (id) ON DELETE CASCADE
         )
         """)
 
@@ -152,6 +154,14 @@ class Database:
         self.cursor.execute("DELETE FROM config")
         self.conn.commit()
         logger.info("Todos los datos han sido eliminados de la base de datos.")
+
+    def eliminar_todos_los_equipos(self):
+        """Elimina todos los equipos y partidos, pero conserva la configuración."""
+        logger.warning("Iniciando borrado de todos los equipos y partidos...")
+        # Debido a ON DELETE CASCADE, al borrar los equipos, los partidos se van automáticamente.
+        self.cursor.execute("DELETE FROM equipos")
+        self.conn.commit()
+        logger.info("Todos los equipos y partidos han sido eliminados.")
 
     def obtener_config(self, llave, valor_por_defecto=None):
         """

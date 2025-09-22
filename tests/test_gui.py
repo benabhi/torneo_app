@@ -156,7 +156,7 @@ def test_reiniciar_eliminatorias_confirmado(app, mocker):
     mock_update_call = mocker.spy(app, 'actualizar_todas_las_vistas')
 
     # 2. Act:
-    app.reiniciar_fases_eliminatorias()
+    app.reiniciar_fases_eliminatorias_gui()
 
     # 3. Assert:
     # Verifica que el método de la base de datos fue llamado.
@@ -176,8 +176,40 @@ def test_reiniciar_eliminatorias_cancelado(app, mocker):
     mock_db_call = mocker.spy(lib.database.db, 'reiniciar_fases_eliminatorias')
 
     # 2. Act:
-    app.reiniciar_fases_eliminatorias()
+    app.reiniciar_fases_eliminatorias_gui()
 
     # 3. Assert:
     # Verifica que el método de la base de datos NUNCA fue llamado.
     mock_db_call.assert_not_called()
+
+def test_volver_a_fase_grupos_confirmado(app, mocker):
+    """
+    Verifica que la lógica de "volver atrás" a la fase de grupos llama
+    a los métodos correctos de la base de datos (reiniciar y desbloquear).
+    """
+    # Arrange: Simula confirmación del usuario y espía los métodos de la DB.
+    mocker.patch('tkinter.messagebox.askyesno', return_value=True)
+    spy_reiniciar = mocker.spy(lib.database.db, 'reiniciar_fases_eliminatorias')
+    spy_desbloquear = mocker.spy(lib.database.db, 'desbloquear_fase_grupos')
+
+    # Act: Llama al método de volver atrás.
+    app.volver_a_fase_grupos()
+
+    # Assert: Verifica que ambos métodos de la base de datos fueron llamados.
+    spy_reiniciar.assert_called_once()
+    spy_desbloquear.assert_called_once()
+
+def test_eliminar_todos_los_equipos_confirmado(app, mocker):
+    """
+    Verifica que al confirmar la eliminación de todos los equipos, se llama
+    al método correcto de la base de datos.
+    """
+    # Arrange: Simula confirmación del usuario y espía el método de la DB.
+    mocker.patch('tkinter.messagebox.askyesno', return_value=True)
+    spy_db = mocker.spy(lib.database.db, 'eliminar_todos_los_equipos')
+
+    # Act: Llama al método de la GUI.
+    app.eliminar_todos_los_equipos()
+
+    # Assert: Verifica que el método de la base de datos fue llamado.
+    spy_db.assert_called_once()
