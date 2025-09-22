@@ -105,7 +105,7 @@ El código está organizado de forma modular para facilitar su mantenimiento y e
 │   └── test_logic.py                   # Tests para las reglas del torneo
 ├── Docs/                               # Documentación varia
 │   ├── Wireframe - Fase X.png.py       # Archivos de imagen de los wireframes de la app
-│   └── interactive_workgflow.html       # Documento interactivo de como funciona la app
+│   └── interactive_workgflow.html      # Documento interactivo de como funciona la app
 ├── scripts/                            # Scripts varios para desarrollo
 │   ├── bundle.bat                      # Todo el codigo fuente en un solo archivo (importante para IA)
 │   └── bundle_with_line_numbers.bat    # Lo mismo que el anterior pero con numeros de linea
