@@ -108,5 +108,6 @@ El código está organizado de forma modular para facilitar su mantenimiento y e
 ├── main.py                   # Punto de entrada principal para ejecutar la aplicación
 ├── pytest.ini                # Archivo de configuración para pytest
 ├── README.md                 # Este archivo
-└── requirements.txt          # Lista de dependencias de Python
+├── requirements.txt          # Lista de dependencias de Python
+└── screenshot.png            # Screenshot de la app para mostrar en el readme
 ```
