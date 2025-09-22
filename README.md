@@ -90,24 +90,29 @@ El código está organizado de forma modular para facilitar su mantenimiento y e
 
 ```
 .
-├── lib/                      # Directorio con la lógica principal de la aplicación
-│   ├── __init__.py           # Convierte 'lib' en un paquete de Python
-│   ├── config.py             # Configuración central (zonas, equipos, etc.)
-│   ├── database.py           # Gestión de la base de datos (SQLite3)
-│   ├── gui.py                # Lógica y construcción de la interfaz gráfica (Tkinter)
-│   ├── logger.py             # Configuración del sistema de logging
-│   ├── logic.py              # Lógica del torneo (generación de fixtures y llaves)
-│   └── widgets.py            # Widgets personalizados de Tkinter (Tooltip, etc.)
-├── tests/                    # Suite de tests automatizados
-│   ├── __init__.py           #
-│   ├── test_database.py      # Tests para la capa de base de datos
-│   ├── test_gui.py           # Tests para la lógica de la interfaz
-│   └── test_logic.py         # Tests para las reglas del torneo
-├── .gitignore                # Archivos a ignorar por Git
-├── icon.png                  # Ícono de la aplicación
-├── main.py                   # Punto de entrada principal para ejecutar la aplicación
-├── pytest.ini                # Archivo de configuración para pytest
-├── README.md                 # Este archivo
-├── requirements.txt          # Lista de dependencias de Python
-└── screenshot.png            # Screenshot de la app para mostrar en el readme
+├── lib/                                # Directorio con la lógica principal de la aplicación
+│   ├── __init__.py                     # Convierte 'lib' en un paquete de Python
+│   ├── config.py                        # Configuración central (zonas, equipos, etc.)
+│   ├── database.py                     # Gestión de la base de datos (SQLite3)
+│   ├── gui.py                          # Lógica y construcción de la interfaz gráfica (Tkinter)
+│   ├── logger.py                       # Configuración del sistema de logging
+│   ├── logic.py                        # Lógica del torneo (generación de fixtures y llaves)
+│   └── widgets.py                      # Widgets personalizados de Tkinter (Tooltip, etc.)
+├── tests/                              # Suite de tests automatizados
+│   ├── __init__.py                     #
+│   ├── test_database.py                # Tests para la capa de base de datos
+│   ├── test_gui.py                     # Tests para la lógica de la interfaz
+│   └── test_logic.py                   # Tests para las reglas del torneo
+├── Docs/                               # Documentación varia
+│   ├── Wireframe - Fase X.png.py       # Archivos de imagen de los wireframes de la app
+│   └── interactive_workgflow.html       # Documento interactivo de como funciona la app
+├── scripts/                            # Scripts varios para desarrollo
+│   ├── bundle.bat                      # Todo el codigo fuente en un solo archivo (importante para IA)
+│   └── bundle_with_line_numbers.bat    # Lo mismo que el anterior pero con numeros de linea
+├── .gitignore                          # Archivos a ignorar por Git
+├── icon.png                            # Ícono de la aplicación
+├── main.py                             # Punto de entrada principal para ejecutar la aplicación
+├── pytest.ini                          # Archivo de configuración para pytest
+├── README.md                           # Este archivo
+└── requirements.txt                    # Lista de dependencias de Python
 ```
