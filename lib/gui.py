@@ -89,6 +89,9 @@ class App(tk.Tk):
         style.map('Test.TButton', background=[('active', '#fff59d')])
         style.configure('Content.TFrame', background='#fafafa', relief='solid', borderwidth=1)
         style.configure('Content.TLabel', background='#fafafa')
+        style.configure('Winner.TLabel', foreground='green', background='#fafafa')
+        style.configure('Loser.TLabel', foreground='red', background='#fafafa')
+        style.configure('Normal.TLabel', background='#fafafa')
 
         # --- 3. Carga de Recursos (Iconos) ---
         # Se cargan todos los iconos una sola vez al inicio para optimizar el rendimiento.
@@ -111,7 +114,7 @@ class App(tk.Tk):
         # Almacena la tupla del partido seleccionado en la lista de pendientes.
         self.partido_seleccionado = None
         # Diccionario para mantener referencias a los widgets de entrada de goles en las fases eliminatorias.
-        self.entry_widgets_por_fase = {}
+        self.match_row_widgets_por_fase = {}
         # Caché para almacenar los escudos ya coloreados y evitar regenerarlos.
         self.escudos_coloreados_cache = {}
         # Diccionario para acceder rápidamente a los datos de un equipo por su nombre.
@@ -121,16 +124,21 @@ class App(tk.Tk):
 
         # --- 5. Construcción de la Estructura Principal de la GUI ---
         # Se empaqueta la BARRA DE ESTADO PRIMERO para que reserve su espacio en la parte inferior.
-        self.status_bar = ttk.Frame(self, relief="sunken")
+        self.status_bar = ttk.Frame(self, relief="sunken", height=25)
         self.status_bar.pack(side="bottom", fill="x", padx=1, pady=1)
+        self.status_bar.pack_propagate(False) # Evita que el frame cambie de tamaño
 
         # Etiqueta para mostrar el total de equipos. Se alinea a la izquierda.
         self.status_label_equipos = ttk.Label(self.status_bar, text="Equipos: 0", anchor="w")
         self.status_label_equipos.pack(side="left", padx=10, pady=2)
 
         # Etiqueta para mostrar la fase actual del torneo.
-        self.status_label_fase = ttk.Label(self.status_bar, text="Fase: Configuración", anchor="w")
+        self.status_label_fase = ttk.Label(self.status_bar, text="Etapa: Equipos", anchor="w")
         self.status_label_fase.pack(side="left", padx=10, pady=2)
+
+        # Etiqueta para mensajes de bloqueo.
+        self.status_label_bloqueo = ttk.Label(self.status_bar, text="", foreground="blue", font=("Arial", 9, "italic"), anchor="w")
+        self.status_label_bloqueo.pack(side="left", padx=10, pady=2)
 
         # Etiqueta para mensajes de estado. Se alinea a la derecha para que no
         # se solape con las otras etiquetas.
@@ -144,11 +152,11 @@ class App(tk.Tk):
 
         # Se crean los Frames (contenedores) para cada pestaña.
         self.frame_equipos = ttk.Frame(self.notebook)
-        self.notebook.add(self.frame_equipos, text="1. Gestionar Equipos")
+        self.notebook.add(self.frame_equipos, text="Etapa 1: Equipos")
         self.frame_grupos = ttk.Frame(self.notebook)
-        self.notebook.add(self.frame_grupos, text="2. Fase de Grupos")
+        self.notebook.add(self.frame_grupos, text="Etapa 2: Grupos")
         self.frame_eliminatorias = ttk.Frame(self.notebook)
-        self.notebook.add(self.frame_eliminatorias, text="3. Fases Eliminatorias")
+        self.notebook.add(self.frame_eliminatorias, text="Etapa 3: Eliminatorias")
 
         # --- 6. Llamada a los Métodos Constructores de Widgets ---
         # Se llama a un método separado para construir el contenido de cada pestaña,
@@ -197,15 +205,13 @@ class App(tk.Tk):
         self.status_label_equipos.config(text=f"Equipos: {total_equipos}")
 
         # Determina y muestra la fase actual del torneo.
-        fase_actual_texto = "Configuración"
+        etapa_actual_texto = "Equipos"
         if database.db.fase_grupos_bloqueada():
-            # Aquí se podría añadir lógica más compleja para detectar la fase
-            # eliminatoria específica (Cuartos, Semifinal, etc.).
-            fase_actual_texto = "Fases Eliminatorias"
+            etapa_actual_texto = "Eliminatorias"
         elif database.db.equipos_bloqueados():
-            fase_actual_texto = "Fase de Grupos"
+            etapa_actual_texto = "Grupos"
 
-        self.status_label_fase.config(text=f"Fase: {fase_actual_texto}")
+        self.status_label_fase.config(text=f"Etapa: {etapa_actual_texto}")
 
         # Muestra el mensaje de estado pasado como argumento.
         self.status_label_mensaje.config(text=mensaje)
@@ -221,6 +227,14 @@ class App(tk.Tk):
         equipos_estan_bloqueados = database.db.equipos_bloqueados()
         grupos_estan_bloqueados = database.db.fase_grupos_bloqueada()
 
+        # Actualiza el mensaje de bloqueo en la barra de estado
+        bloqueo_msg = ""
+        if grupos_estan_bloqueados:
+            bloqueo_msg = "Etapa 2 y 3: Bloqueadas"
+        elif equipos_estan_bloqueados:
+            bloqueo_msg = "Etapa 1: Bloqueada"
+        self.status_label_bloqueo.config(text=bloqueo_msg)
+
         # Calcula cuántos equipos hay en cada zona.
         equipos_por_zona = {zona: 0 for zona in config.ZONAS_DEL_TORNEO}
         num_equipos = 0
@@ -231,192 +245,171 @@ class App(tk.Tk):
                 equipos_por_zona[zona] += 1
 
         estado_botones_eliminar = 'normal' if num_equipos > 0 else 'disabled'
-
-
-        # Verifica si todas las zonas han alcanzado el máximo de equipos.
         todos_los_grupos_llenos = all(count == config.MAX_EQUIPOS_POR_ZONA for count in equipos_por_zona.values())
 
         # --- Lógica para la Pestaña "Gestionar Equipos" ---
         if hasattr(self, 'btn_agregar'):
-            if equipos_estan_bloqueados:
-                # Si los equipos están bloqueados, deshabilita todos los controles de edición.
-                self.entry_nombre.config(state='disabled')
-                self.combo_zona.config(state='disabled')
-                self.btn_agregar.config(state='disabled')
-                self.btn_modificar.config(state='disabled')
-                self.btn_eliminar_seleccionado.config(state='disabled')
-                self.btn_eliminar_todos_equipos.config(state='disabled')
-                if config.BOTONES_PRUEBA_VISIBLES: self.btn_autogen_equipos.config(state='disabled')
-                self.btn_confirmar_equipos.config(state='disabled')
-                self.lbl_equipos_bloqueados.grid() # Muestra el label informativo.
-            else:
-                # Si no están bloqueados, habilita los controles.
-                self.entry_nombre.config(state='normal')
-                self.combo_zona.config(state='normal')
-                self.btn_modificar.config(state='normal')
-                self.btn_eliminar_seleccionado.config(state=estado_botones_eliminar)
-                self.btn_eliminar_todos_equipos.config(state=estado_botones_eliminar)
-                if config.BOTONES_PRUEBA_VISIBLES: self.btn_autogen_equipos.config(state='normal')
-                self.lbl_equipos_bloqueados.grid_remove() # Oculta el label.
+            is_bloqueado = equipos_estan_bloqueados
+            estado = 'disabled' if is_bloqueado else 'normal'
 
-                # Lógica para deshabilitar el botón "Agregar" si una zona está llena.
+            self.entry_nombre.config(state=estado)
+            self.combo_zona.config(state=estado)
+            self.btn_agregar.config(state=estado)
+            self.btn_modificar.config(state='disabled' if is_bloqueado or not self.tree_equipos.selection() else 'normal')
+            self.btn_eliminar_seleccionado.config(state='disabled' if is_bloqueado or not self.tree_equipos.selection() else 'normal')
+            self.btn_eliminar_datos_etapa1.config(state='disabled' if is_bloqueado else estado_botones_eliminar)
+            if config.BOTONES_PRUEBA_VISIBLES:
+                self.btn_generar_prueba_etapa1.config(state=estado)
+
+            estado_confirmar = 'normal' if todos_los_grupos_llenos and not is_bloqueado else 'disabled'
+            self.btn_confirmar_etapa1.config(state=estado_confirmar)
+
+            if not is_bloqueado:
                 zona_seleccionada = self.combo_zona.get()
-                if zona_seleccionada:
-                    num_equipos_en_zona = equipos_por_zona.get(zona_seleccionada, 0)
-                    if num_equipos_en_zona >= config.MAX_EQUIPOS_POR_ZONA:
-                        self.btn_agregar.config(state='disabled')
-                        widgets.Tooltip(self.btn_agregar, f"La Zona '{zona_seleccionada}' está llena (máx: {config.MAX_EQUIPOS_POR_ZONA}).")
-                    else:
-                        self.btn_agregar.config(state='normal')
-                        widgets.Tooltip(self.btn_agregar, "Añadir el equipo a la base de datos.")
+                if zona_seleccionada and equipos_por_zona.get(zona_seleccionada, 0) >= config.MAX_EQUIPOS_POR_ZONA:
+                    self.btn_agregar.config(state='disabled')
+                    widgets.Tooltip(self.btn_agregar, f"La Zona '{zona_seleccionada}' está llena (máx: {config.MAX_EQUIPOS_POR_ZONA}).")
                 else:
-                    self.btn_agregar.config(state='normal')
                     widgets.Tooltip(self.btn_agregar, "Añadir el equipo a la base de datos.")
-
-                # Habilita el botón para confirmar y bloquear equipos solo si todas las zonas están llenas.
-                estado_confirmar = 'normal' if todos_los_grupos_llenos else 'disabled'
-                self.btn_confirmar_equipos.config(state=estado_confirmar)
 
         # Habilita o deshabilita la pestaña de Fase de Grupos.
         self.notebook.tab(1, state='normal' if equipos_estan_bloqueados else 'disabled')
 
         # --- Lógica para la Pestaña "Fase de Grupos" ---
-        if hasattr(self, 'btn_confirmar_grupos'):
-            # Verifica si quedan partidos pendientes en alguna zona.
-            todos_jugados = True
-            for zona in config.ZONAS_DEL_TORNEO:
-                if logic.generar_fixture_zona(zona): # Si la lista no está vacía, hay pendientes.
-                    todos_jugados = False
-                    break
+        if hasattr(self, 'btn_confirmar_etapa2'):
+            is_bloqueado = grupos_estan_bloqueados
+            estado = 'disabled' if is_bloqueado else 'normal'
 
-            # Verifica si existen resultados para habilitar el botón de eliminar.
-            partidos_de_grupo = database.db.obtener_partidos_fase('Grupo')
+            for child in self.frame_grupos.winfo_children():
+                try: child.config(state=estado)
+                except tk.TclError: pass
 
-            if grupos_estan_bloqueados:
-                # Si la fase de grupos está bloqueada, deshabilita casi todo.
-                for child in self.frame_grupos.winfo_children():
-                    try: child.config(state='disabled')
-                    except tk.TclError: pass
-                self.lbl_info_bloqueo.grid(); self.lbl_info_bloqueo.config(state='normal')
-                self.btn_confirmar_grupos.grid_remove()
-                self.btn_volver_a_equipos.grid_remove()
-                self.btn_reiniciar_grupos.grid_remove()
+            if is_bloqueado:
+                self.btn_volver_etapa2.config(state='disabled')
+                self.btn_eliminar_datos_etapa2.config(state='disabled')
+                if config.BOTONES_PRUEBA_VISIBLES: self.btn_generar_prueba_etapa2.config(state='disabled')
+                self.btn_confirmar_etapa2.config(state='disabled')
             else:
-                # Si la fase de grupos NO está bloqueada, habilita los controles.
-                for child in self.frame_grupos.winfo_children():
-                    try: child.config(state='normal')
-                    except tk.TclError: pass
+                todos_jugados = not any(logic.generar_fixture_zona(zona) for zona in config.ZONAS_DEL_TORNEO)
+                partidos_de_grupo = database.db.obtener_partidos_fase('Grupo')
 
-                self.lbl_info_bloqueo.grid_remove()
-                self.btn_volver_a_equipos.grid()
-                self.btn_reiniciar_grupos.grid()
-                self.btn_confirmar_grupos.grid()
+                self.btn_volver_etapa2.config(state='normal')
+                self.btn_eliminar_datos_etapa2.config(state='normal' if partidos_de_grupo else 'disabled')
+                if config.BOTONES_PRUEBA_VISIBLES: self.btn_generar_prueba_etapa2.config(state='normal')
 
-                self.btn_volver_a_equipos.config(state='normal' if equipos_estan_bloqueados else 'disabled')
-                self.btn_reiniciar_grupos.config(state='normal' if partidos_de_grupo else 'disabled')
-
-                # Habilita el botón de confirmar fase solo si todos los partidos se han jugado.
                 estado_confirmar = 'normal' if todos_jugados and num_equipos > 0 else 'disabled'
-                self.btn_confirmar_grupos.config(state=estado_confirmar)
+                self.btn_confirmar_etapa2.config(state=estado_confirmar)
 
         # Habilita o deshabilita la pestaña de Fases Eliminatorias.
         self.notebook.tab(2, state='normal' if grupos_estan_bloqueados else 'disabled')
+
+        # --- Lógica para la Pestaña "Fases Eliminatorias" ---
+        if hasattr(self, 'btn_volver_etapa3'):
+            fases_map = {16: "Octavos", 8: "Cuartos", 4: "Semifinal", 2: "Final"}
+            fases_posibles = [f for n, f in fases_map.items() if n <= len(config.ZONAS_DEL_TORNEO) * config.EQUIPOS_CLASIFICAN_POR_ZONA]
+            hay_partidos_eliminatorios = any(database.db.obtener_partidos_fase(fase) for fase in fases_posibles)
+
+            self.btn_volver_etapa3.config(state='normal' if grupos_estan_bloqueados else 'disabled')
+            self.btn_eliminar_datos_etapa3.config(state='normal' if hay_partidos_eliminatorios and grupos_estan_bloqueados else 'disabled')
+
+        # Lógica para el botón "Eliminar Todos los Datos" (siempre habilitado)
+        if hasattr(self, 'btn_eliminar_todo1'):
+            self.btn_eliminar_todo1.config(state='normal')
+            self.btn_eliminar_todo2.config(state='normal')
+            self.btn_eliminar_todo3.config(state='normal')
+
 
     def _on_zona_seleccionada(self, event=None):
         """Callback que se ejecuta cuando el usuario selecciona una zona en el Combobox."""
         self._update_ui_state()
 
+    def _on_tree_hover(self, event):
+        """Cambia el color de fondo de la fila del Treeview bajo el cursor."""
+        tree = event.widget
+        item = tree.identify_row(event.y)
+        for row in tree.get_children():
+            tree.item(row, tags=('' if row != item else 'hover'))
+
     def crear_widgets_equipos(self):
         """Construye todos los widgets para la pestaña 'Gestionar Equipos'."""
-        # --- Frame del Formulario ---
-        frame_form = ttk.LabelFrame(self.frame_equipos, text="Gestión de Equipos")
-        frame_form.pack(fill="x", padx=10, pady=10)
-        frame_form.columnconfigure(1, weight=1) # Hace que la columna 1 (Entry) se expanda.
+        # --- Frame del Formulario (Altura Fija) ---
+        frame_form = ttk.LabelFrame(self.frame_equipos, text="Gestión de Equipos", height=65)
+        frame_form.pack(side="top", fill="x", padx=10, pady=10)
+        frame_form.pack_propagate(False)
 
-        ttk.Label(frame_form, text="Nombre:").grid(row=0, column=0, padx=5, pady=5, sticky="w")
-        self.entry_nombre = ttk.Entry(frame_form)
-        self.entry_nombre.grid(row=0, column=1, padx=5, pady=5, sticky="ew")
-        self.btn_agregar = ttk.Button(frame_form, text=" Agregar", image=self.icon_add, compound="left", command=self.agregar_equipo)
-        self.btn_agregar.grid(row=0, column=2, padx=5, pady=5, sticky="ew")
-        widgets.Tooltip(self.btn_agregar, "Añadir el equipo a la base de datos.")
-        btn_eliminar_datos = ttk.Button(frame_form, text=" Borrar Todo", image=self.icon_delete_all, compound="left", command=self.eliminar_todos_los_datos, style='Danger.TButton')
-        btn_eliminar_datos.grid(row=0, column=3, padx=15, pady=5, sticky="ew")
-        widgets.Tooltip(btn_eliminar_datos, "¡CUIDADO! Borra permanentemente todos los datos.")
+        form_content = ttk.Frame(frame_form)
+        form_content.pack(fill="x", expand=True, padx=10, pady=10)
+        form_content.columnconfigure(1, weight=1)
 
-        ttk.Label(frame_form, text="Zona:").grid(row=1, column=0, padx=5, pady=5, sticky="w")
-        self.combo_zona = ttk.Combobox(frame_form, values=config.ZONAS_DEL_TORNEO)
-        self.combo_zona.grid(row=1, column=1, padx=5, pady=5, sticky="ew")
+        ttk.Label(form_content, text="Nombre:").grid(row=0, column=0, padx=(0, 5))
+        self.entry_nombre = ttk.Entry(form_content)
+        self.entry_nombre.grid(row=0, column=1, sticky="ew")
+        self.entry_nombre.bind("<Return>", lambda event: self.agregar_equipo())
+        ttk.Label(form_content, text="Zona:").grid(row=0, column=2, padx=(15, 5))
+        self.combo_zona = ttk.Combobox(form_content, values=config.ZONAS_DEL_TORNEO, width=15)
+        self.combo_zona.grid(row=0, column=3)
         self.combo_zona.bind("<<ComboboxSelected>>", self._on_zona_seleccionada)
-        self.btn_modificar = ttk.Button(frame_form, text=" Modificar", image=self.icon_edit, compound="left", command=self.modificar_equipo)
-        self.btn_modificar.grid(row=1, column=2, padx=5, pady=5, sticky="ew")
+        self.btn_agregar = ttk.Button(form_content, text=" Agregar", image=self.icon_add, compound="left", command=self.agregar_equipo)
+        self.btn_agregar.grid(row=0, column=4, padx=(15, 5))
+        widgets.Tooltip(self.btn_agregar, "Añadir el equipo a la base de datos.")
+        self.btn_modificar = ttk.Button(form_content, text=" Modificar", image=self.icon_edit, compound="left", command=self.modificar_equipo, state='disabled')
+        self.btn_modificar.grid(row=0, column=5)
 
-        # Botón de prueba, solo visible si está activado en config.py.
+        # --- Frame para Botones Inferiores (Altura Fija) ---
+        botonera = widgets.ActionButtonBar(self.frame_equipos)
+        self.btn_eliminar_seleccionado = botonera.add_button(text="Eliminar Seleccionado", image=self.icon_delete, compound="left", command=self.eliminar_equipo, state='disabled')
+        self.btn_eliminar_datos_etapa1 = botonera.add_button(text="Eliminar Datos de Etapa", image=self.icon_delete_all, compound="left", command=self.eliminar_todos_los_equipos, style='Danger.TButton')
+        self.btn_eliminar_todo1 = botonera.add_button(text="Eliminar Todos los Datos", image=self.icon_delete_all, compound="left", command=self.eliminar_todos_los_datos, style='Danger.TButton')
         if config.BOTONES_PRUEBA_VISIBLES:
-            self.btn_autogen_equipos = ttk.Button(frame_form, text=" Generar Equipos", image=self.icon_generate, compound="left", command=self.autogenerar_equipos_prueba, style='Test.TButton')
-            self.btn_autogen_equipos.grid(row=1, column=3, padx=15, pady=5, sticky="ew")
-            widgets.Tooltip(self.btn_autogen_equipos, f"PRUEBAS!: Borra los datos y genera {config.MAX_EQUIPOS_POR_ZONA} equipos por zona.")
+            self.btn_generar_prueba_etapa1 = botonera.add_button(text="Generar Datos de Prueba", image=self.icon_generate, compound="left", command=self.autogenerar_equipos_prueba, style='Test.TButton')
+        self.btn_confirmar_etapa1 = botonera.add_button(text="Confirmar Etapa", image=self.icon_next, compound="right", command=self.confirmar_lista_equipos)
 
-        # --- Frame de la Lista (Tabla) ---
-        frame_lista = ttk.LabelFrame(self.frame_equipos, text="Lista de Equipos"); frame_lista.pack(fill="both", expand=True, padx=10, pady=10)
+        # --- Frame de la Lista (Altura Flexible) ---
+        frame_lista = ttk.LabelFrame(self.frame_equipos, text="Lista de Equipos");
+        frame_lista.pack(side="top", fill="both", expand=True, padx=10, pady=(0, 10))
+
         tree_container = ttk.Frame(frame_lista); tree_container.pack(fill="both", expand=True)
-
-        # El Treeview es el widget usado para mostrar datos en formato de tabla.
         columns = ("ID", "Nombre", "Zona", "Color")
         self.tree_equipos = ttk.Treeview(tree_container, columns=columns, show="headings")
+        self.tree_equipos.tag_configure('hover', background='#E8F0FE')
         scrollbar_equipos = ttk.Scrollbar(tree_container, orient="vertical", command=self.tree_equipos.yview)
         self.tree_equipos.configure(yscrollcommand=scrollbar_equipos.set)
-
-        # Configuración de las cabeceras y columnas de la tabla.
         self.tree_equipos.heading("ID", text="ID"); self.tree_equipos.column("ID", width=50, anchor="center")
         self.tree_equipos.heading("Nombre", text="Nombre")
         self.tree_equipos.heading("Zona", text="Zona"); self.tree_equipos.column("Zona", width=80, anchor="center")
         self.tree_equipos.heading("Color", text="Color"); self.tree_equipos.column("Color", width=100, anchor="center")
-
         scrollbar_equipos.pack(side="right", fill="y"); self.tree_equipos.pack(side="left", fill="both", expand=True)
-        # Asocia el evento de selección de una fila con el método `seleccionar_equipo`.
         self.tree_equipos.bind("<<TreeviewSelect>>", self.seleccionar_equipo)
+        self.tree_equipos.bind("<Motion>", self._on_tree_hover)
 
-        # --- Frame para Botones Inferiores ---
-        bottom_frame_lista = ttk.Frame(frame_lista)
-        bottom_frame_lista.pack(fill="x", pady=5)
-        bottom_frame_lista.columnconfigure(2, weight=1)
-
-        self.btn_eliminar_seleccionado = ttk.Button(bottom_frame_lista, text=f" Eliminar Seleccionado", image=self.icon_delete, compound="left", command=self.eliminar_equipo)
-        self.btn_eliminar_seleccionado.grid(row=0, column=0, sticky='w')
-
-        self.btn_eliminar_todos_equipos = ttk.Button(bottom_frame_lista, text="Eliminar Todos", image=self.icon_delete_all, compound="left", command=self.eliminar_todos_los_equipos, style='Danger.TButton')
-        self.btn_eliminar_todos_equipos.grid(row=0, column=1, sticky='w', padx=5)
-
-        self.btn_confirmar_equipos = ttk.Button(bottom_frame_lista, text=f"Confirmar Equipos ", image=self.icon_next, compound="right", command=self.confirmar_lista_equipos)
-        self.btn_confirmar_equipos.grid(row=0, column=3, sticky='e')
-        self.lbl_equipos_bloqueados = ttk.Label(bottom_frame_lista, text="La lista de equipos está bloqueada.", font=("Arial", 10, "italic"), foreground="blue")
-        self.lbl_equipos_bloqueados.grid(row=0, column=0, columnspan=4)
-
-        # Carga inicial de los datos en la tabla.
         self.actualizar_lista_equipos()
 
     def confirmar_lista_equipos(self):
-        """Acción del botón 'Confirmar Equipos'. Muestra una advertencia y bloquea la edición."""
+        """Acción del botón 'Confirmar Etapa'. Muestra una advertencia y bloquea la edición."""
         if messagebox.askyesno("Confirmar y Bloquear", "Está a punto de bloquear la lista de equipos.\n\nDespués de esto, no podrá agregar, modificar o eliminar equipos.\n¿Desea continuar?"):
             database.db.establecer_config('equipos_bloqueados', '1')
             logger.warning("¡Lista de equipos bloqueada!")
-            self.actualizar_todas_las_vistas("Lista de equipos bloqueada. Puede proceder a la Fase de Grupos.")
-            messagebox.showinfo("Lista Bloqueada", "La lista de equipos ha sido bloqueada. Ahora puede proceder a la Fase de Grupos.")
-            self.notebook.select(self.frame_grupos) # Cambia a la siguiente pestaña.
+            self.actualizar_todas_las_vistas("Lista de equipos bloqueada. Puede proceder a la Etapa de Grupos.")
+            messagebox.showinfo("Lista Bloqueada", "La lista de equipos ha sido bloqueada. Ahora puede proceder a la Etapa de Grupos.")
+            self.notebook.select(self.frame_grupos)
 
     def eliminar_todos_los_datos(self):
-        """Acción del botón 'Borrar Todo'. Operación destructiva que reinicia el torneo."""
-        if messagebox.askyesno("Confirmar Borrado Total", "¡ADVERTENCIA!\n\nEsto borrará permanentemente TODOS los equipos y partidos de la base de datos.\n\n¿Está absolutamente seguro de que desea continuar?"):
+        """Acción del botón 'Eliminar Todos los Datos'. Operación destructiva que reinicia el torneo."""
+        if messagebox.askyesno("Confirmar Borrado Total", "¡ADVERTENCIA!\n\nEsto borrará permanentemente TODOS los equipos, partidos y configuraciones de la base de datos.\n\n¿Está absolutamente seguro de que desea continuar?"):
             database.db.borrar_todos_los_datos()
             logger.critical("¡TODOS LOS DATOS HAN SIDO BORRADOS POR EL USUARIO!")
             self.actualizar_todas_las_vistas("Todos los datos del torneo han sido eliminados.")
             messagebox.showinfo("Operación Completada", "Todos los datos del torneo han sido eliminados.")
+            if self.notebook.index('current') != 0:
+                self.notebook.select(self.frame_equipos)
 
     def crear_widgets_grupos(self):
         """Construye todos los widgets para la pestaña 'Fase de Grupos'."""
-        # Estructura principal de la pestaña con dos columnas.
-        top_frame = ttk.Frame(self.frame_grupos); top_frame.pack(fill="x", padx=10, pady=10)
-        # Columna izquierda: Partidos pendientes y registro de resultados.
+        # --- Frame de controles superiores (Altura Fija) ---
+        top_frame = ttk.Frame(self.frame_grupos, height=150)
+        top_frame.pack(side="top", fill="x", padx=10, pady=10)
+        top_frame.pack_propagate(False)
+
         frame_pendientes = ttk.LabelFrame(top_frame, text="Partidos Pendientes"); frame_pendientes.pack(side="left", fill="both", expand=True, padx=(0, 5))
         control_frame = ttk.Frame(frame_pendientes); control_frame.pack(fill="x", padx=5, pady=5)
         control_frame.columnconfigure(1, weight=1)
@@ -428,22 +421,19 @@ class App(tk.Tk):
         self.msg_no_pendientes = ttk.Label(frame_pendientes, text="Todos los partidos de esta zona han sido jugados.", font=("Arial", 10, "italic"), anchor="center")
         self.tree_partidos_pendientes = self._crear_tabla_partidos_pendientes(self.tree_pendientes_container)
         self.tree_partidos_pendientes.bind("<<TreeviewSelect>>", self.seleccionar_partido)
-        # Columna derecha: Formulario para ingresar goles.
-        frame_registro = ttk.LabelFrame(top_frame, text="Registrar Resultado"); frame_registro.pack(side="right", fill="y", padx=(5, 0))
+        self.tree_partidos_pendientes.bind("<Motion>", self._on_tree_hover)
+        self.tree_partidos_pendientes.tag_configure('hover', background='#E8F0FE')
+
+        frame_registro = ttk.LabelFrame(top_frame, text="Registrar Resultado"); frame_registro.pack(side="right", fill="both", padx=(5, 0), expand=True)
         frame_registro.columnconfigure((0, 2), weight=1); frame_registro.rowconfigure((0, 2, 4), weight=1)
         self.lbl_local = ttk.Label(frame_registro, text="Seleccione un partido", font=("Arial", 10, "bold")); self.lbl_local.grid(row=0, column=0, columnspan=3, pady=(10,0))
-
-        # Se añaden las opciones `validate` y `validatecommand` a los Entry de goles.
-        # `validate='key'` significa que la validación se dispara con cada pulsación de tecla.
-        # `validatecommand` se asocia con el comando registrado en __init__.
-        self.entry_goles_local = ttk.Entry(frame_registro, width=5, justify='center',
-                                           validate='key', validatecommand=self.vcmd)
+        self.entry_goles_local = ttk.Entry(frame_registro, width=5, justify='center', validate='key', validatecommand=self.vcmd)
         self.entry_goles_local.grid(row=1, column=0, sticky='e', padx=(10,0))
+        self.entry_goles_local.bind("<Return>", lambda e: self.registrar_partido_grupo())
         ttk.Label(frame_registro, text="vs").grid(row=1, column=1, padx=5)
-        self.entry_goles_visitante = ttk.Entry(frame_registro, width=5, justify='center',
-                                               validate='key', validatecommand=self.vcmd)
+        self.entry_goles_visitante = ttk.Entry(frame_registro, width=5, justify='center', validate='key', validatecommand=self.vcmd)
         self.entry_goles_visitante.grid(row=1, column=2, sticky='w', padx=(0,10))
-
+        self.entry_goles_visitante.bind("<Return>", lambda e: self.registrar_partido_grupo())
         self.lbl_visitante = ttk.Label(frame_registro, text="", font=("Arial", 10, "bold")); self.lbl_visitante.grid(row=2, column=0, columnspan=3)
         btn_frame = ttk.Frame(frame_registro); btn_frame.grid(row=3, column=0, columnspan=3, pady=(0,10))
         self.btn_guardar_resultado_grupo = ttk.Button(btn_frame, text=" Guardar", image=self.icon_save, compound="left", command=self.registrar_partido_grupo)
@@ -451,41 +441,29 @@ class App(tk.Tk):
         self.btn_limpiar_formulario = ttk.Button(btn_frame, text=" Limpiar", image=self.icon_clear, compound="left", command=self._limpiar_formulario_partido)
         self.btn_limpiar_formulario.pack(side="left", padx=5)
 
-        # Botón de prueba para autogenerar resultados.
+        # --- Frame de botones inferiores (Altura Fija) ---
+        botonera = widgets.ActionButtonBar(self.frame_grupos)
+        self.btn_volver_etapa2 = botonera.add_button(text="Volver Etapa", image=self.icon_reset, compound="left", command=self.volver_a_gestion_equipos, style='Danger.TButton')
+        self.btn_eliminar_datos_etapa2 = botonera.add_button(text="Eliminar Datos de Etapa", image=self.icon_delete, compound="left", command=self.reiniciar_fase_grupos_gui, style='Danger.TButton')
+        self.btn_eliminar_todo2 = botonera.add_button(text="Eliminar Todos los Datos", image=self.icon_delete_all, compound="left", command=self.eliminar_todos_los_datos, style='Danger.TButton')
         if config.BOTONES_PRUEBA_VISIBLES:
-            self.btn_autogen_res = ttk.Button(self.frame_grupos, text=" Generar Resultados", image=self.icon_generate, compound="left", command=self.autogenerar_resultados_prueba, style='Test.TButton')
-            self.btn_autogen_res.pack(pady=(0, 5), fill="x", padx=10)
-            widgets.Tooltip(self.btn_autogen_res, "PRUEBAS!: Registra resultados aleatorios para todos los partidos\nde la fase de grupos que estén pendientes.")
+            self.btn_generar_prueba_etapa2 = botonera.add_button(text="Generar Datos de Prueba", image=self.icon_generate, compound="left", command=self.autogenerar_resultados_prueba, style='Test.TButton')
+        self.btn_confirmar_etapa2 = botonera.add_button(text="Confirmar Etapa", image=self.icon_next, compound="right", command=self.confirmar_fase_grupos)
 
-        # Tabla de posiciones que ocupa la parte inferior de la pestaña.
-        frame_tabla = ttk.LabelFrame(self.frame_grupos, text="Tabla de Posiciones General"); frame_tabla.pack(fill="both", expand=True, padx=10, pady=10)
+        # --- Tabla de posiciones (Altura Flexible) ---
+        frame_tabla = ttk.LabelFrame(self.frame_grupos, text="Tabla de Posiciones General")
+        frame_tabla.pack(side="top", fill="both", expand=True, padx=10, pady=(0, 10))
+
         tree_pos_container = ttk.Frame(frame_tabla); tree_pos_container.pack(fill="both", expand=True, padx=5, pady=5)
         cols = ("Zona", "Equipo", "PJ", "PG", "PE", "PP", "GF", "GC", "DG", "Puntos")
-        self.tree_posiciones = ttk.Treeview(tree_pos_container, columns=cols, show="headings", height=8)
+        self.tree_posiciones = ttk.Treeview(tree_pos_container, columns=cols, show="headings")
         scrollbar_posiciones = ttk.Scrollbar(tree_pos_container, orient="vertical", command=self.tree_posiciones.yview)
         self.tree_posiciones.configure(yscrollcommand=scrollbar_posiciones.set)
-
         for col in cols:
-            # Asocia un comando a cada cabecera para permitir ordenar la tabla.
             self.tree_posiciones.heading(col, text=col, command=lambda c=col: self.ordenar_tabla_posiciones(c, False))
             width = 80 if col not in ["Equipo"] else 150
             self.tree_posiciones.column(col, width=width, anchor="center")
-
         scrollbar_posiciones.pack(side="right", fill="y"); self.tree_posiciones.pack(side="left", fill="both", expand=True)
-
-        # Botones inferiores de la pestaña.
-        bottom_frame = ttk.Frame(self.frame_grupos); bottom_frame.pack(fill="x")
-        bottom_frame.columnconfigure(2, weight=1)
-        self.btn_volver_a_equipos = ttk.Button(bottom_frame, text=f" Volver a Equipos", image=self.icon_reset, compound="left", command=self.volver_a_gestion_equipos, style='Danger.TButton')
-        self.btn_volver_a_equipos.grid(row=0, column=0, padx=10, pady=10, sticky="w")
-
-        self.btn_reiniciar_grupos = ttk.Button(bottom_frame, text="Eliminar Resultados", image=self.icon_delete, compound="left", command=self.reiniciar_fase_grupos_gui, style='Danger.TButton')
-        self.btn_reiniciar_grupos.grid(row=0, column=1, padx=(0, 10), pady=10, sticky="w")
-
-        self.btn_confirmar_grupos = ttk.Button(bottom_frame, text=f"Confirmar Fase ", image=self.icon_next, compound="right", command=self.confirmar_fase_grupos)
-        self.btn_confirmar_grupos.grid(row=0, column=3, padx=10, pady=10, sticky="e")
-        self.lbl_info_bloqueo = ttk.Label(bottom_frame, text="La fase de grupos está bloqueada.", font=("Arial", 10, "italic"), foreground="blue")
-        self.lbl_info_bloqueo.grid(row=0, column=0, columnspan=4)
 
         self.actualizar_tablas()
 
@@ -512,7 +490,7 @@ class App(tk.Tk):
     def _crear_tabla_partidos_pendientes(self, parent):
         """Función auxiliar para crear una tabla (Treeview) de partidos."""
         cols = ("Local", "Visitante")
-        tree = ttk.Treeview(parent, columns=cols, show="headings", height=5)
+        tree = ttk.Treeview(parent, columns=cols, show="headings", height=3)
         scrollbar = ttk.Scrollbar(parent, orient="vertical", command=tree.yview)
         tree.configure(yscrollcommand=scrollbar.set)
         tree.heading("Local", text="Equipo Local"); tree.column("Local", anchor="e")
@@ -521,24 +499,23 @@ class App(tk.Tk):
         return tree
 
     def confirmar_fase_grupos(self):
-        """Acción del botón 'Confirmar Fase'. Bloquea la carga de resultados."""
+        """Acción del botón 'Confirmar Etapa'. Bloquea la carga de resultados."""
         if messagebox.askyesno("Confirmar y Bloquear", "Está a punto de bloquear la fase de grupos.\n\nDespués de esto, no podrá registrar nuevos resultados.\n¿Desea continuar?"):
             database.db.establecer_config('fase_grupos_bloqueada', '1')
             logger.warning("¡Fase de grupos bloqueada!")
             self.actualizar_todas_las_vistas("Fase de grupos bloqueada. Puede generar las fases eliminatorias.")
-            self._actualizar_vista_eliminatorias()
             messagebox.showinfo("Fase Bloqueada", "La fase de grupos ha sido bloqueada. Ahora puede generar las fases eliminatorias.")
             self.notebook.select(self.frame_eliminatorias)
 
     def reiniciar_fase_grupos_gui(self):
-        """Acción del botón 'Eliminar Resultados'. Borra todos los partidos de grupos."""
-        if messagebox.askyesno("Eliminar Resultados", "Esto borrará TODOS los resultados de la fase de grupos.\nLos equipos no serán eliminados.\n\n¿Desea continuar?"):
+        """Acción del botón 'Eliminar Datos de Etapa'. Borra todos los partidos de grupos."""
+        if messagebox.askyesno("Eliminar Datos de Etapa", "Esto borrará TODOS los resultados de la fase de grupos.\nLos equipos no serán eliminados.\n\n¿Desea continuar?"):
             database.db.reiniciar_fase_grupos()
             self.actualizar_todas_las_vistas("Resultados de la fase de grupos eliminados.")
             messagebox.showinfo("Resultados Eliminados", "Todos los resultados de la fase de grupos han sido eliminados.")
 
     def reiniciar_fases_eliminatorias_gui(self):
-        """Acción del botón 'Reiniciar Eliminatorias'. Borra todos los partidos de las fases de playoffs."""
+        """Acción del botón 'Eliminar Datos de Etapa'. Borra todos los partidos de las fases de playoffs."""
         if messagebox.askyesno("Confirmar Reinicio de Eliminatorias", "¡ADVERTENCIA!\n\nEsto borrará TODOS los resultados de las fases eliminatorias (Octavos, Cuartos, etc.).\nLa fase de grupos no se verá afectada.\n\n¿Desea continuar?"):
             database.db.reiniciar_fases_eliminatorias()
             self.actualizar_todas_las_vistas("Fases eliminatorias reiniciadas.")
@@ -546,40 +523,40 @@ class App(tk.Tk):
 
     def volver_a_gestion_equipos(self):
         """
-        Acción del botón 'Volver a Equipos'.
+        Acción del botón 'Volver Etapa'.
         Reinicia la fase de grupos y desbloquea la lista de equipos.
         """
         msg = ("¡ADVERTENCIA!\n\n"
-               "Está a punto de volver a la fase de gestión de equipos.\n"
+               "Está a punto de volver a la etapa de gestión de equipos.\n"
                "Esto borrará permanentemente TODOS los resultados de la Fase de Grupos.\n\n"
                "¿Desea continuar?")
         if messagebox.askyesno("Confirmar Retroceso", msg):
             database.db.reiniciar_fase_grupos()
             database.db.desbloquear_equipos()
-            logger.warning("Retrocediendo a la fase de gestión de equipos.")
+            logger.warning("Retrocediendo a la etapa de gestión de equipos.")
             self.actualizar_todas_las_vistas("Fase de Grupos reiniciada. Puede volver a gestionar los equipos.")
-            messagebox.showinfo("Fase Reiniciada", "Se han borrado los resultados de la fase de grupos y la lista de equipos ha sido desbloqueada.")
+            messagebox.showinfo("Etapa Reiniciada", "Se han borrado los resultados de la fase de grupos y la lista de equipos ha sido desbloqueada.")
             self.notebook.select(self.frame_equipos)
 
     def volver_a_fase_grupos(self):
         """
-        Acción del botón 'Volver a Fase de Grupos'.
+        Acción del botón 'Volver Etapa'.
         Reinicia las eliminatorias y desbloquea la fase de grupos.
         """
         msg = ("¡ADVERTENCIA!\n\n"
-               "Está a punto de volver a la Fase de Grupos.\n"
+               "Está a punto de volver a la Etapa de Grupos.\n"
                "Esto borrará permanentemente TODOS los resultados de las Fases Eliminatorias (Octavos, Cuartos, etc.).\n\n"
                "¿Desea continuar?")
         if messagebox.askyesno("Confirmar Retroceso", msg):
             database.db.reiniciar_fases_eliminatorias()
             database.db.desbloquear_fase_grupos()
-            logger.warning("Retrocediendo a la fase de grupos.")
-            self.actualizar_todas_las_vistas("Fases eliminatorias reiniciadas. Puede volver a la Fase de Grupos.")
-            messagebox.showinfo("Fase Reiniciada", "Se han borrado los resultados de las eliminatorias y la Fase de Grupos ha sido desbloqueada.")
+            logger.warning("Retrocediendo a la etapa de grupos.")
+            self.actualizar_todas_las_vistas("Fases eliminatorias reiniciadas. Puede volver a la Etapa de Grupos.")
+            messagebox.showinfo("Etapa Reiniciada", "Se han borrado los resultados de las eliminatorias y la Etapa de Grupos ha sido desbloqueada.")
             self.notebook.select(self.frame_grupos)
 
     def autogenerar_equipos_prueba(self):
-        """Acción del botón 'Generar Equipos'. Llena el torneo con datos de prueba."""
+        """Acción del botón 'Generar Datos de Prueba'. Llena el torneo con datos de prueba."""
         if not messagebox.askyesno("Confirmar Autogeneración", "Esto borrará todos los datos existentes y generará equipos de prueba basados en la configuración actual."): return
         logger.info("Iniciando autogeneración de equipos de prueba.")
         database.db.borrar_todos_los_datos()
@@ -638,12 +615,18 @@ class App(tk.Tk):
     def seleccionar_equipo(self, event):
         """Callback que se ejecuta al seleccionar una fila en la tabla de equipos."""
         selected_item = self.tree_equipos.selection()
-        if not selected_item: return
-        item_values = self.tree_equipos.item(selected_item, "values")
-        # Rellena el formulario de edición con los datos del equipo seleccionado.
-        self.entry_nombre.delete(0, tk.END); self.entry_nombre.insert(0, item_values[1])
-        self.combo_zona.set(item_values[2])
-        self._on_zona_seleccionada()
+        is_bloqueado = database.db.equipos_bloqueados()
+
+        if selected_item and not is_bloqueado:
+            self.btn_modificar.config(state='normal')
+            self.btn_eliminar_seleccionado.config(state='normal')
+            item_values = self.tree_equipos.item(selected_item, "values")
+            self.entry_nombre.delete(0, tk.END)
+            self.entry_nombre.insert(0, item_values[1])
+            self.combo_zona.set(item_values[2])
+        else:
+            self.btn_modificar.config(state='disabled')
+            self.btn_eliminar_seleccionado.config(state='disabled')
 
     def modificar_equipo(self):
         """Acción del botón 'Modificar'. Actualiza un equipo existente."""
@@ -683,8 +666,8 @@ class App(tk.Tk):
             self._actualizar_barra_estado(f"Equipo '{nombre_equipo}' eliminado.")
 
     def eliminar_todos_los_equipos(self):
-        """Acción del botón 'Eliminar Todos'. Borra todos los equipos y partidos."""
-        if messagebox.askyesno("Confirmar Eliminación Total de Equipos", "¡ADVERTENCIA!\n\nEsto eliminará permanentemente TODOS los equipos y sus partidos asociados, pero conservará el estado del torneo.\n\n¿Está seguro que desea continuar?"):
+        """Acción del botón 'Eliminar Datos de Etapa'. Borra todos los equipos y partidos."""
+        if messagebox.askyesno("Confirmar Eliminación de Datos de Etapa", "¡ADVERTENCIA!\n\nEsto eliminará permanentemente TODOS los equipos y sus partidos asociados para esta etapa.\n\n¿Está seguro que desea continuar?"):
             database.db.eliminar_todos_los_equipos()
             self.actualizar_todas_las_vistas("Todos los equipos han sido eliminados.")
             messagebox.showinfo("Operación Completada", "Todos los equipos y sus partidos han sido eliminados.")
@@ -705,6 +688,8 @@ class App(tk.Tk):
         self.update_idletasks()
         # Llama a la función que dibuja los cuadros de colores sobre la tabla.
         self._render_color_boxes()
+        # Asegurarse de que los botones de modificar/eliminar estén deshabilitados si no hay selección.
+        self.seleccionar_equipo(None)
 
     def _render_color_boxes(self):
         """Dibuja los cuadros de color en la columna 'Color' de la tabla de equipos."""
@@ -740,7 +725,7 @@ class App(tk.Tk):
                 pass
 
     def autogenerar_resultados_prueba(self):
-        """Acción del botón 'Generar Resultados'. Registra resultados aleatorios."""
+        """Acción del botón 'Generar Datos de Prueba'. Registra resultados aleatorios."""
         if not messagebox.askyesno("Confirmar Autogeneración", "Esto generará resultados aleatorios para TODOS los partidos de grupo pendientes.\n¿Desea continuar?"): return
         logger.info("Iniciando autogeneración de resultados de prueba.")
         todos_pendientes = []
@@ -844,41 +829,16 @@ class App(tk.Tk):
 
     def crear_widgets_eliminatorias(self):
         """Construye la estructura base para la pestaña de 'Fases Eliminatorias'."""
-
-        # El contenedor principal ahora alojará el área de scroll y el botón inferior.
-        main_container = ttk.Frame(self.frame_eliminatorias)
-        main_container.pack(fill="both", expand=True)
-
-        # Se crea un frame inferior para el botón, que no se desplazará con el scroll.
-        bottom_controls_frame = ttk.Frame(main_container)
-        bottom_controls_frame.pack(side="bottom", fill="x", padx=10, pady=(5, 10))
-
-        # Se crea el botón de reinicio y se guarda como un atributo de la instancia
-        # para poder mostrarlo u ocultarlo dinámicamente.
-        self.btn_volver_a_grupos = ttk.Button(
-            bottom_controls_frame,
-            text=" Volver a Fase de Grupos",
-            image=self.icon_reset,
-            compound="left",
-            command=self.volver_a_fase_grupos,
-            style='Danger.TButton'
-        )
-        self.btn_volver_a_grupos.pack(side="left")
-
-        self.btn_reiniciar_eliminatorias = ttk.Button(
-            bottom_controls_frame,
-            text=" Reiniciar Eliminatorias",
-            image=self.icon_delete,
-            compound="left",
-            command=self.reiniciar_fases_eliminatorias_gui,
-            style='Danger.TButton'
-        )
-        self.btn_reiniciar_eliminatorias.pack(side="left", padx=5)
+        # Frame de botones inferiores (Altura Fija)
+        botonera = widgets.ActionButtonBar(self.frame_eliminatorias)
+        self.btn_volver_etapa3 = botonera.add_button(text="Volver Etapa", image=self.icon_reset, compound="left", command=self.volver_a_fase_grupos, style='Danger.TButton')
+        self.btn_eliminar_datos_etapa3 = botonera.add_button(text="Eliminar Datos de Etapa", image=self.icon_delete, compound="left", command=self.reiniciar_fases_eliminatorias_gui, style='Danger.TButton')
+        self.btn_eliminar_todo3 = botonera.add_button(text="Eliminar Todos los Datos", image=self.icon_delete_all, compound="left", command=self.eliminar_todos_los_datos, style='Danger.TButton')
 
         # El área de scroll (Canvas) ahora se empaqueta en la parte superior,
         # ocupando todo el espacio restante.
-        canvas_container = ttk.Frame(main_container)
-        canvas_container.pack(side="top", fill="both", expand=True)
+        canvas_container = ttk.Frame(self.frame_eliminatorias)
+        canvas_container.pack(side="top", fill="both", expand=True, padx=10, pady=(10, 0))
 
         canvas = tk.Canvas(canvas_container)
         scrollbar = ttk.Scrollbar(canvas_container, orient="vertical", command=canvas.yview)
@@ -918,19 +878,6 @@ class App(tk.Tk):
                 fases_ordenadas.append(fases_map[num_equipos])
             num_equipos //= 2
 
-        # Se comprueba si la fase de grupos está bloqueada para mostrar el botón de retroceso.
-        fase_grupos_esta_bloqueada = database.db.fase_grupos_bloqueada()
-
-        self.btn_volver_a_grupos.pack_forget()
-        self.btn_reiniciar_eliminatorias.pack_forget()
-
-        if fase_grupos_esta_bloqueada:
-             self.btn_volver_a_grupos.pack(side="left")
-             self.btn_reiniciar_eliminatorias.pack(side="left", padx=5)
-
-        hay_partidos_eliminatorios = any(database.db.obtener_partidos_fase(fase) for fase in fases_ordenadas)
-        self.btn_reiniciar_eliminatorias.config(state='normal' if hay_partidos_eliminatorios else 'disabled')
-
         # Si la final ya se jugó, muestra al campeón.
         partidos_final = database.db.obtener_partidos_fase("Final")
         if partidos_final and len(partidos_final) >= 1:
@@ -945,9 +892,13 @@ class App(tk.Tk):
                 frame_fase = widgets.CollapsibleFrame(self.fases_container, text=f"{fase} de Final - Jugado", expanded=False)
                 frame_fase.pack(fill="x", padx=10, pady=5, expand=True)
                 ttk.Separator(self.fases_container, orient='horizontal').pack(fill='x', padx=10, pady=5)
-                self._configurar_grid_fase(frame_fase.container)
                 for j, (_, local, visitante, goles_l, goles_v) in enumerate(partidos_jugados):
-                    self._crear_widget_partido_jugado(frame_fase.container, j, local, visitante, goles_l, goles_v, len(partidos_jugados))
+                    local_data = {'nombre': local, 'escudo': self._get_escudo(local)}
+                    visitante_data = {'nombre': visitante, 'escudo': self._get_escudo(visitante)}
+                    widgets.MatchRowWidget(frame_fase.container, local_data, visitante_data, resultado=(goles_l, goles_v)).pack(fill='x')
+                    if j < len(partidos_jugados) - 1:
+                        ttk.Separator(frame_fase.container, orient='horizontal').pack(fill='x', pady=8, padx=10)
+
             else:
                 # Si encuentra una fase sin partidos, esa es la fase activa.
                 fase_anterior = fases_ordenadas[i-1] if i > 0 else "Grupo"
@@ -961,6 +912,15 @@ class App(tk.Tk):
         if not fase_activa_encontrada and not database.db.obtener_partidos_fase(nombre_fase_inicial) and database.db.fase_grupos_bloqueada():
              self.btn_generar_octavos = ttk.Button(self.fases_container, text=f" Generar {nombre_fase_inicial} de Final", image=self.icon_generate, compound="left", command=self._generar_y_mostrar_fase_inicial)
              self.btn_generar_octavos.pack(pady=10, padx=10)
+
+    def _get_escudo(self, nombre_equipo):
+        """Obtiene una imagen de escudo para un equipo, usando un caché."""
+        if config.ESCUDOS_VISIBLES:
+            if nombre_equipo not in self.escudos_coloreados_cache:
+                color = self.equipos_data.get(nombre_equipo, {}).get('color', '#888888')
+                self.escudos_coloreados_cache[nombre_equipo] = fa.icon_to_image("shield-alt", fill=color, scale_to_height=14)
+            return self.escudos_coloreados_cache[nombre_equipo]
+        return None
 
     def _generar_y_mostrar_fase_inicial(self):
         """Acción del botón 'Generar Octavos'. Simplemente refresca la vista."""
@@ -980,89 +940,22 @@ class App(tk.Tk):
         frame_fase = widgets.CollapsibleFrame(self.fases_container, text=f"{fase} de Final")
         frame_fase.pack(fill="x", padx=10, pady=5, expand=True)
         ttk.Separator(self.fases_container, orient='horizontal').pack(fill='x', padx=10, pady=5)
-        self._configurar_grid_fase(frame_fase.container)
 
         if not enfrentamientos:
             return
 
-        self.entry_widgets_por_fase[fase] = []
+        self.match_row_widgets_por_fase[fase] = []
         for i, (local, visitante) in enumerate(enfrentamientos):
-            self._crear_widget_partido_editable(frame_fase.container, i, local, visitante)
+            local_data = {'nombre': local, 'escudo': self._get_escudo(local)}
+            visitante_data = {'nombre': visitante, 'escudo': self._get_escudo(visitante)}
+            match_row = widgets.MatchRowWidget(frame_fase.container, local_data, visitante_data, vcmd=self.vcmd, editable=True)
+            match_row.pack(fill='x')
+            self.match_row_widgets_por_fase[fase].append((local, visitante, match_row))
+
             if i < len(enfrentamientos) - 1:
-                ttk.Separator(frame_fase.container, orient='horizontal').grid(row=2 * i + 1, column=0, columnspan=5, sticky='ew', pady=8)
+                ttk.Separator(frame_fase.container, orient='horizontal').pack(fill='x', pady=8, padx=10)
 
-        ttk.Button(frame_fase.container, text=f" Registrar Todos los Partidos de {fase}", image=self.icon_confirm, compound="left", command=lambda f=fase: self.registrar_fase_completa(f)).grid(row=2 * len(enfrentamientos), columnspan=5, pady=10)
-
-    def _crear_widget_partido_jugado(self, parent, row_index, local, visitante, goles_l, goles_v, total_partidos):
-        """Crea la fila de un partido ya jugado, mostrando el resultado y coloreando al ganador."""
-        row = 2 * row_index
-        font_normal = ("Arial", 10); font_bold = ("Arial", 10, "bold")
-        color_winner, color_loser = "green", "red"
-        # Determina los estilos (fuente y color) para el ganador y el perdedor.
-        if goles_l > goles_v:
-            color_local, font_local = color_winner, font_bold
-            color_visitante, font_visitante = color_loser, font_normal
-        elif goles_v > goles_l:
-            color_local, font_local = color_loser, font_normal
-            color_visitante, font_visitante = color_winner, font_bold
-        else: # Empate (aunque no debería ocurrir en eliminatorias)
-            color_local, font_local = "black", font_normal
-            color_visitante, font_visitante = "black", font_normal
-
-        # Si los escudos están habilitados, los muestra junto al nombre.
-        if config.ESCUDOS_VISIBLES:
-            color_local_escudo = self.equipos_data.get(local, {}).get('color', '#888888')
-            color_visitante_escudo = self.equipos_data.get(visitante, {}).get('color', '#888888')
-            # Usa un caché para no regenerar la imagen del escudo si ya se creó.
-            if local not in self.escudos_coloreados_cache: self.escudos_coloreados_cache[local] = fa.icon_to_image("shield-alt", fill=color_local_escudo, scale_to_height=14)
-            if visitante not in self.escudos_coloreados_cache: self.escudos_coloreados_cache[visitante] = fa.icon_to_image("shield-alt", fill=color_visitante_escudo, scale_to_height=14)
-            img_local, img_visitante = self.escudos_coloreados_cache[local], self.escudos_coloreados_cache[visitante]
-            tk.Label(parent, text=f"{local} ", image=img_local, compound="right", anchor="e", font=font_normal, background="#fafafa").grid(row=row, column=0, sticky="ew", padx=5)
-            tk.Label(parent, text=f" {visitante}", image=img_visitante, compound="left", anchor="w", font=font_normal, background="#fafafa").grid(row=row, column=4, sticky="ew", padx=5)
-        else: # Si no, solo muestra el texto del nombre.
-            tk.Label(parent, text=local, anchor="e", font=font_normal, background="#fafafa").grid(row=row, column=0, sticky="ew", padx=5)
-            tk.Label(parent, text=visitante, anchor="w", font=font_normal, background="#fafafa").grid(row=row, column=4, sticky="ew", padx=5)
-
-        # Muestra los goles con el estilo (color/fuente) determinado.
-        tk.Label(parent, text=str(goles_l), anchor="center", font=font_local, fg=color_local, width=4, background="#fafafa").grid(row=row, column=1, padx=2)
-        tk.Label(parent, text="-", anchor="center", font=font_normal, background="#fafafa").grid(row=row, column=2)
-        tk.Label(parent, text=str(goles_v), anchor="center", font=font_visitante, fg=color_visitante, width=4, background="#fafafa").grid(row=row, column=3, padx=2)
-
-        # Añade un separador visual entre los partidos.
-        if row_index < total_partidos - 1:
-            ttk.Separator(parent, orient='horizontal').grid(row=row + 1, column=0, columnspan=5, sticky='ew', pady=8)
-
-    def _crear_widget_partido_editable(self, parent, row_index, local, visitante):
-        """Crea la fila de un partido pendiente de jugar, con campos de entrada para los goles."""
-        row = 2 * row_index
-        if config.ESCUDOS_VISIBLES:
-            color_local_escudo = self.equipos_data.get(local, {}).get('color', '#888888')
-            color_visitante_escudo = self.equipos_data.get(visitante, {}).get('color', '#888888')
-            if local not in self.escudos_coloreados_cache: self.escudos_coloreados_cache[local] = fa.icon_to_image("shield-alt", fill=color_local_escudo, scale_to_height=14)
-            if visitante not in self.escudos_coloreados_cache: self.escudos_coloreados_cache[visitante] = fa.icon_to_image("shield-alt", fill=color_visitante_escudo, scale_to_height=14)
-            img_local, img_visitante = self.escudos_coloreados_cache[local], self.escudos_coloreados_cache[visitante]
-            ttk.Label(parent, text=f"{local} ", image=img_local, compound="right", style='Content.TLabel').grid(row=row, column=0, sticky="e", padx=5)
-            ttk.Label(parent, text=f" {visitante}", image=img_visitante, compound="left", style='Content.TLabel').grid(row=row, column=4, sticky="w", padx=5)
-        else:
-            ttk.Label(parent, text=local, anchor="e", style='Content.TLabel').grid(row=row, column=0, sticky="ew", padx=5)
-            ttk.Label(parent, text=visitante, anchor="w", style='Content.TLabel').grid(row=row, column=4, sticky="ew", padx=5)
-
-        # Se reutiliza el mismo comando de validación para estos Entrys dinámicos.
-        goles_local = ttk.Entry(parent, width=4, justify="center",
-                                validate='key', validatecommand=self.vcmd)
-        goles_local.grid(row=row, column=1, padx=2)
-        ttk.Label(parent, text="vs", style='Content.TLabel').grid(row=row, column=2)
-        goles_visitante = ttk.Entry(parent, width=4, justify="center",
-                                    validate='key', validatecommand=self.vcmd)
-
-        goles_visitante.grid(row=row, column=3, padx=2)
-
-        # Guarda una referencia a los widgets de entrada para poder leer sus valores más tarde.
-        fase_actual_texto = parent.master.text
-        fase_actual = fase_actual_texto.split(' ')[0]
-        if fase_actual not in self.entry_widgets_por_fase:
-            self.entry_widgets_por_fase[fase_actual] = []
-        self.entry_widgets_por_fase[fase_actual].append((local, visitante, goles_local, goles_visitante))
+        ttk.Button(frame_fase.container, text=f" Registrar Todos los Partidos de {fase}", image=self.icon_confirm, compound="left", command=lambda f=fase: self.registrar_fase_completa(f)).pack(pady=10)
 
     def _mostrar_campeon(self):
         """Muestra una sección especial con el nombre del campeón del torneo."""
@@ -1077,23 +970,16 @@ class App(tk.Tk):
             lbl_campeon.pack(pady=15)
             self._actualizar_barra_estado(f"¡El campeón del torneo es {ganador_final[0]}!")
 
-    def _configurar_grid_fase(self, frame_container):
-        """Configura las columnas del grid para alinear los partidos en las fases eliminatorias."""
-        frame_container.columnconfigure(0, weight=1) # Equipo local (se expande a la izquierda)
-        frame_container.columnconfigure(1, weight=0) # Gol local (tamaño fijo)
-        frame_container.columnconfigure(2, weight=0) # Separador "vs" (tamaño fijo)
-        frame_container.columnconfigure(3, weight=0) # Gol visitante (tamaño fijo)
-        frame_container.columnconfigure(4, weight=1) # Equipo visitante (se expande a la derecha)
-
     def registrar_fase_completa(self, fase):
         """
         Acción del botón 'Registrar Todos'. Valida y guarda todos los resultados
         de una fase eliminatoria de una sola vez.
         """
-        partidos_info = self.entry_widgets_por_fase.get(fase, [])
+        partidos_info = self.match_row_widgets_por_fase.get(fase, [])
         resultados_validados = []
         # Itera sobre cada partido y sus widgets de entrada.
-        for i, (local, visitante, entry_local, entry_visitante) in enumerate(partidos_info):
+        for i, (local, visitante, match_row) in enumerate(partidos_info):
+            entry_local, entry_visitante = match_row.get_result_entries()
             try:
                 # Intenta convertir los valores a enteros.
                 goles_local, goles_visitante = int(entry_local.get()), int(entry_visitante.get())
@@ -1120,6 +1006,5 @@ class App(tk.Tk):
 
         messagebox.showinfo("Éxito", f"Se han registrado todos los partidos de {fase}.")
         logger.warning(f"¡Fase '{fase}' completada y registrada!")
-        # Actualiza la vista para mostrar la siguiente fase.
-        self._actualizar_vista_eliminatorias()
-        self._actualizar_barra_estado(f"Resultados de {fase} de Final registrados.")
+        # Actualiza toda la vista para mostrar la siguiente fase y re-evaluar los estados de los botones.
+        self.actualizar_todas_las_vistas(f"Resultados de {fase} de Final registrados.")

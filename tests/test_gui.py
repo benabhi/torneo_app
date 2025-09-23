@@ -143,25 +143,38 @@ def test_agregar_equipo_campos_vacios(app, mocker):
     # Verifica que se mostró la advertencia correcta al usuario.
     mock_showwarning.assert_called_once_with("Campos vacíos", "Debe ingresar un nombre y seleccionar una zona.")
 
+def test_reiniciar_fase_grupos_confirmado(app, mocker):
+    """
+    Verifica que al confirmar el reinicio de la fase de grupos, se llama
+    al método correcto de la base de datos y se actualiza la UI.
+    """
+    # Arrange
+    mocker.patch('tkinter.messagebox.askyesno', return_value=True)
+    mock_db_call = mocker.spy(lib.database.db, 'reiniciar_fase_grupos')
+    mock_update_call = mocker.spy(app, 'actualizar_todas_las_vistas')
+
+    # Act
+    app.reiniciar_fase_grupos_gui()
+
+    # Assert
+    mock_db_call.assert_called_once()
+    mock_update_call.assert_called_once()
+
 def test_reiniciar_eliminatorias_confirmado(app, mocker):
     """
     Verifica que al confirmar el reinicio de eliminatorias, se llama
     al método correcto de la base de datos y se actualiza la UI.
     """
-    # 1. Arrange:
-    # Simula que el usuario hace clic en "Sí" en la ventana de confirmación.
+    # Arrange
     mocker.patch('tkinter.messagebox.askyesno', return_value=True)
-    # Espía los métodos que deberían ser llamados.
     mock_db_call = mocker.spy(lib.database.db, 'reiniciar_fases_eliminatorias')
     mock_update_call = mocker.spy(app, 'actualizar_todas_las_vistas')
 
-    # 2. Act:
+    # Act
     app.reiniciar_fases_eliminatorias_gui()
 
-    # 3. Assert:
-    # Verifica que el método de la base de datos fue llamado.
+    # Assert
     mock_db_call.assert_called_once()
-    # Verifica que la UI se actualizó.
     mock_update_call.assert_called_once()
 
 def test_reiniciar_eliminatorias_cancelado(app, mocker):
@@ -169,17 +182,14 @@ def test_reiniciar_eliminatorias_cancelado(app, mocker):
     Verifica que si el usuario cancela el reinicio, no se realiza
     ninguna acción en la base de datos.
     """
-    # 1. Arrange:
-    # Simula que el usuario hace clic en "No".
+    # Arrange
     mocker.patch('tkinter.messagebox.askyesno', return_value=False)
-    # Espía el método de la base de datos.
     mock_db_call = mocker.spy(lib.database.db, 'reiniciar_fases_eliminatorias')
 
-    # 2. Act:
+    # Act
     app.reiniciar_fases_eliminatorias_gui()
 
-    # 3. Assert:
-    # Verifica que el método de la base de datos NUNCA fue llamado.
+    # Assert
     mock_db_call.assert_not_called()
 
 def test_volver_a_fase_grupos_confirmado(app, mocker):
@@ -187,15 +197,15 @@ def test_volver_a_fase_grupos_confirmado(app, mocker):
     Verifica que la lógica de "volver atrás" a la fase de grupos llama
     a los métodos correctos de la base de datos (reiniciar y desbloquear).
     """
-    # Arrange: Simula confirmación del usuario y espía los métodos de la DB.
+    # Arrange
     mocker.patch('tkinter.messagebox.askyesno', return_value=True)
     spy_reiniciar = mocker.spy(lib.database.db, 'reiniciar_fases_eliminatorias')
     spy_desbloquear = mocker.spy(lib.database.db, 'desbloquear_fase_grupos')
 
-    # Act: Llama al método de volver atrás.
+    # Act
     app.volver_a_fase_grupos()
 
-    # Assert: Verifica que ambos métodos de la base de datos fueron llamados.
+    # Assert
     spy_reiniciar.assert_called_once()
     spy_desbloquear.assert_called_once()
 
@@ -204,12 +214,12 @@ def test_eliminar_todos_los_equipos_confirmado(app, mocker):
     Verifica que al confirmar la eliminación de todos los equipos, se llama
     al método correcto de la base de datos.
     """
-    # Arrange: Simula confirmación del usuario y espía el método de la DB.
+    # Arrange
     mocker.patch('tkinter.messagebox.askyesno', return_value=True)
     spy_db = mocker.spy(lib.database.db, 'eliminar_todos_los_equipos')
 
-    # Act: Llama al método de la GUI.
+    # Act
     app.eliminar_todos_los_equipos()
 
-    # Assert: Verifica que el método de la base de datos fue llamado.
+    # Assert
     spy_db.assert_called_once()

@@ -15,6 +15,9 @@ Widgets definidos:
 - Tooltip: Una clase que añade mensajes emergentes (tooltips) a cualquier widget.
 - CollapsibleFrame: Un widget de tipo "acordeón" que puede mostrar y ocultar
   su contenido, ideal para organizar la información verticalmente.
+- ActionButtonBar: Un contenedor estandarizado para las barras de botones inferiores.
+- MatchRowWidget: Un widget que representa visualmente una fila de partido,
+  ya sea jugado o por jugar.
 """
 
 # Se importa la librería `tkinter` completa como 'tk' para los componentes base.
@@ -170,3 +173,122 @@ class CollapsibleFrame(ttk.Frame):
 
         # Invierte el valor booleano del estado.
         self._expanded = not self._expanded
+
+# --- Widget Personalizado: Barra de Botones de Acción ---
+class ActionButtonBar(ttk.Frame):
+    """
+    Un contenedor estandarizado para las barras de botones inferiores de cada etapa.
+    Se encarga de crear la estructura de centrado y proporciona un método
+    sencillo para añadir botones.
+    """
+    def __init__(self, parent, height=50, **kwargs):
+        """
+        Inicializa la barra de botones.
+        """
+        super().__init__(parent, height=height, **kwargs)
+        self.pack(side="bottom", fill="x", padx=10)
+        self.pack_propagate(False)
+        self.columnconfigure(0, weight=1)
+        self.columnconfigure(1, weight=0) # Columna central para el frame de botones
+        self.columnconfigure(2, weight=1)
+
+        self.button_frame = ttk.Frame(self)
+        self.button_frame.grid(row=0, column=1)
+
+    def add_button(self, **button_options):
+        """
+        Crea y añade un nuevo botón a la barra.
+
+        Args:
+            **button_options: Opciones para el constructor de ttk.Button (text, image, command, etc.).
+
+        Returns:
+            ttk.Button: La instancia del botón creado.
+        """
+        button = ttk.Button(self.button_frame, **button_options)
+        button.pack(side="left", padx=5)
+        return button
+
+# --- Widget Personalizado: Fila de Partido ---
+class MatchRowWidget(ttk.Frame):
+    """
+    Representa una fila completa para un partido de eliminatorias.
+    Puede ser 'editable' (con campos de entrada) o 'jugado' (mostrando resultados).
+    """
+    def __init__(self, parent, local_data, visitante_data, vcmd=None, editable=False, resultado=None, **kwargs):
+        super().__init__(parent, style='Content.TFrame', **kwargs)
+
+        self.local_data = local_data
+        self.visitante_data = visitante_data
+        self.editable = editable
+        self.vcmd = vcmd
+
+        self._configure_grid()
+
+        if editable:
+            self._create_editable_row()
+        else:
+            self._create_played_row(resultado)
+
+    def _configure_grid(self):
+        """Configura las columnas para alinear los componentes."""
+        self.columnconfigure(0, weight=1)
+        self.columnconfigure(1, weight=0)
+        self.columnconfigure(2, weight=0)
+        self.columnconfigure(3, weight=0)
+        self.columnconfigure(4, weight=1)
+
+    def _create_team_label(self, parent, team_data, compound_side):
+        """Crea la etiqueta de un equipo, con o sin escudo."""
+        text = f" {team_data['nombre']} "
+        if team_data.get('escudo'):
+            return ttk.Label(parent, text=text, image=team_data['escudo'], compound=compound_side, style='Content.TLabel')
+        else:
+            return ttk.Label(parent, text=text, style='Content.TLabel')
+
+    def _create_editable_row(self):
+        """Construye la fila para un partido pendiente."""
+        local_label = self._create_team_label(self, self.local_data, "right")
+        local_label.grid(row=0, column=0, sticky="e", padx=5)
+
+        self.goles_local = ttk.Entry(self, width=4, justify="center", validate='key', validatecommand=self.vcmd)
+        self.goles_local.grid(row=0, column=1, padx=2)
+
+        ttk.Label(self, text="vs", style='Content.TLabel').grid(row=0, column=2)
+
+        self.goles_visitante = ttk.Entry(self, width=4, justify="center", validate='key', validatecommand=self.vcmd)
+        self.goles_visitante.grid(row=0, column=3, padx=2)
+
+        visitante_label = self._create_team_label(self, self.visitante_data, "left")
+        visitante_label.grid(row=0, column=4, sticky="w", padx=5)
+
+    def _create_played_row(self, resultado):
+        """Construye la fila para un partido ya jugado."""
+        goles_l, goles_v = resultado
+        font_normal = ("Arial", 10); font_bold = ("Arial", 10, "bold")
+
+        style_local, font_local = 'Normal.TLabel', font_normal
+        style_visitante, font_visitante = 'Normal.TLabel', font_normal
+
+        if goles_l > goles_v:
+            style_local, font_local = 'Winner.TLabel', font_bold
+            style_visitante, font_visitante = 'Loser.TLabel', font_normal
+        elif goles_v > goles_l:
+            style_local, font_local = 'Loser.TLabel', font_normal
+            style_visitante, font_visitante = 'Winner.TLabel', font_bold
+
+        local_label = self._create_team_label(self, self.local_data, "right")
+        local_label.grid(row=0, column=0, sticky="e", padx=5)
+
+        ttk.Label(self, text=str(goles_l), anchor="center", style=style_local, font=font_local, width=4).grid(row=0, column=1, padx=2)
+        ttk.Label(self, text="-", anchor="center", style='Normal.TLabel', font=font_normal).grid(row=0, column=2)
+        ttk.Label(self, text=str(goles_v), anchor="center", style=style_visitante, font=font_visitante, width=4).grid(row=0, column=3, padx=2)
+
+        visitante_label = self._create_team_label(self, self.visitante_data, "left")
+        visitante_label.grid(row=0, column=4, sticky="w", padx=5)
+
+    def get_result_entries(self):
+        """Devuelve los widgets de entrada de goles si la fila es editable."""
+        if self.editable:
+            return (self.goles_local, self.goles_visitante)
+        return None
