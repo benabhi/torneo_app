@@ -92,7 +92,7 @@ El código está organizado de forma modular para facilitar su mantenimiento y e
 .
 ├── lib/                                # Directorio con la lógica principal de la aplicación
 │   ├── __init__.py                     # Convierte 'lib' en un paquete de Python
-│   ├── config.py                        # Configuración central (zonas, equipos, etc.)
+│   ├── config.py                       # Configuración central (zonas, equipos, etc.)
 │   ├── database.py                     # Gestión de la base de datos (SQLite3)
 │   ├── gui.py                          # Lógica y construcción de la interfaz gráfica (Tkinter)
 │   ├── logger.py                       # Configuración del sistema de logging
