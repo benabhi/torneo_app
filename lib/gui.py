@@ -803,6 +803,7 @@ class App(tk.Tk):
             self.tree_partidos_pendientes.selection_set(primer_partido_pendiente)
             self.tree_partidos_pendientes.focus(primer_partido_pendiente)
             self.seleccionar_partido(None) # Dispara el evento para rellenar el formulario
+            self.entry_goles_local.focus_set()
 
     def _limpiar_formulario_partido(self, event=None):
         """Limpia y resetea el formulario de registro de resultados."""
