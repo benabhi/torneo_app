@@ -891,14 +891,10 @@ class App(tk.Tk):
                 # Si la fase ya tiene partidos, la muestra como "jugada" y colapsada.
                 frame_fase = widgets.CollapsibleFrame(self.fases_container, text=f"{fase} de Final - Jugado", expanded=False)
                 frame_fase.pack(fill="x", padx=10, pady=5, expand=True)
-                ttk.Separator(self.fases_container, orient='horizontal').pack(fill='x', padx=10, pady=5)
                 for j, (_, local, visitante, goles_l, goles_v) in enumerate(partidos_jugados):
                     local_data = {'nombre': local, 'escudo': self._get_escudo(local)}
                     visitante_data = {'nombre': visitante, 'escudo': self._get_escudo(visitante)}
                     widgets.MatchRowWidget(frame_fase.container, local_data, visitante_data, resultado=(goles_l, goles_v)).pack(fill='x')
-                    if j < len(partidos_jugados) - 1:
-                        ttk.Separator(frame_fase.container, orient='horizontal').pack(fill='x', pady=8, padx=10)
-
             else:
                 # Si encuentra una fase sin partidos, esa es la fase activa.
                 fase_anterior = fases_ordenadas[i-1] if i > 0 else "Grupo"
@@ -939,7 +935,6 @@ class App(tk.Tk):
 
         frame_fase = widgets.CollapsibleFrame(self.fases_container, text=f"{fase} de Final")
         frame_fase.pack(fill="x", padx=10, pady=5, expand=True)
-        ttk.Separator(self.fases_container, orient='horizontal').pack(fill='x', padx=10, pady=5)
 
         if not enfrentamientos:
             return
@@ -951,9 +946,6 @@ class App(tk.Tk):
             match_row = widgets.MatchRowWidget(frame_fase.container, local_data, visitante_data, vcmd=self.vcmd, editable=True)
             match_row.pack(fill='x')
             self.match_row_widgets_por_fase[fase].append((local, visitante, match_row))
-
-            if i < len(enfrentamientos) - 1:
-                ttk.Separator(frame_fase.container, orient='horizontal').pack(fill='x', pady=8, padx=10)
 
         ttk.Button(frame_fase.container, text=f" Registrar Todos los Partidos de {fase}", image=self.icon_confirm, compound="left", command=lambda f=fase: self.registrar_fase_completa(f)).pack(pady=10)
 

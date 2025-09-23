@@ -223,20 +223,24 @@ class MatchRowWidget(ttk.Frame):
         self.editable = editable
         self.vcmd = vcmd
 
-        self._configure_grid()
+        # Frame contenedor interno para manejar el padding
+        content_frame = ttk.Frame(self, style='Content.TLabel', padding=5)
+        content_frame.pack(fill='x', expand=True)
+
+        self._configure_grid(content_frame)
 
         if editable:
-            self._create_editable_row()
+            self._create_editable_row(content_frame)
         else:
-            self._create_played_row(resultado)
+            self._create_played_row(content_frame, resultado)
 
-    def _configure_grid(self):
+    def _configure_grid(self, container):
         """Configura las columnas para alinear los componentes."""
-        self.columnconfigure(0, weight=1)
-        self.columnconfigure(1, weight=0)
-        self.columnconfigure(2, weight=0)
-        self.columnconfigure(3, weight=0)
-        self.columnconfigure(4, weight=1)
+        container.columnconfigure(0, weight=1)
+        container.columnconfigure(1, weight=0)
+        container.columnconfigure(2, weight=0)
+        container.columnconfigure(3, weight=0)
+        container.columnconfigure(4, weight=1)
 
     def _create_team_label(self, parent, team_data, compound_side):
         """Crea la etiqueta de un equipo, con o sin escudo."""
@@ -246,23 +250,23 @@ class MatchRowWidget(ttk.Frame):
         else:
             return ttk.Label(parent, text=text, style='Content.TLabel')
 
-    def _create_editable_row(self):
+    def _create_editable_row(self, container):
         """Construye la fila para un partido pendiente."""
-        local_label = self._create_team_label(self, self.local_data, "right")
+        local_label = self._create_team_label(container, self.local_data, "right")
         local_label.grid(row=0, column=0, sticky="e", padx=5)
 
-        self.goles_local = ttk.Entry(self, width=4, justify="center", validate='key', validatecommand=self.vcmd)
+        self.goles_local = ttk.Entry(container, width=4, justify="center", validate='key', validatecommand=self.vcmd)
         self.goles_local.grid(row=0, column=1, padx=2)
 
-        ttk.Label(self, text="vs", style='Content.TLabel').grid(row=0, column=2)
+        ttk.Label(container, text="vs", style='Content.TLabel').grid(row=0, column=2)
 
-        self.goles_visitante = ttk.Entry(self, width=4, justify="center", validate='key', validatecommand=self.vcmd)
+        self.goles_visitante = ttk.Entry(container, width=4, justify="center", validate='key', validatecommand=self.vcmd)
         self.goles_visitante.grid(row=0, column=3, padx=2)
 
-        visitante_label = self._create_team_label(self, self.visitante_data, "left")
+        visitante_label = self._create_team_label(container, self.visitante_data, "left")
         visitante_label.grid(row=0, column=4, sticky="w", padx=5)
 
-    def _create_played_row(self, resultado):
+    def _create_played_row(self, container, resultado):
         """Construye la fila para un partido ya jugado."""
         goles_l, goles_v = resultado
         font_normal = ("Arial", 10); font_bold = ("Arial", 10, "bold")
@@ -277,14 +281,14 @@ class MatchRowWidget(ttk.Frame):
             style_local, font_local = 'Loser.TLabel', font_normal
             style_visitante, font_visitante = 'Winner.TLabel', font_bold
 
-        local_label = self._create_team_label(self, self.local_data, "right")
+        local_label = self._create_team_label(container, self.local_data, "right")
         local_label.grid(row=0, column=0, sticky="e", padx=5)
 
-        ttk.Label(self, text=str(goles_l), anchor="center", style=style_local, font=font_local, width=4).grid(row=0, column=1, padx=2)
-        ttk.Label(self, text="-", anchor="center", style='Normal.TLabel', font=font_normal).grid(row=0, column=2)
-        ttk.Label(self, text=str(goles_v), anchor="center", style=style_visitante, font=font_visitante, width=4).grid(row=0, column=3, padx=2)
+        ttk.Label(container, text=str(goles_l), anchor="center", style=style_local, font=font_local, width=4).grid(row=0, column=1, padx=2)
+        ttk.Label(container, text="-", anchor="center", style='Normal.TLabel', font=font_normal).grid(row=0, column=2)
+        ttk.Label(container, text=str(goles_v), anchor="center", style=style_visitante, font=font_visitante, width=4).grid(row=0, column=3, padx=2)
 
-        visitante_label = self._create_team_label(self, self.visitante_data, "left")
+        visitante_label = self._create_team_label(container, self.visitante_data, "left")
         visitante_label.grid(row=0, column=4, sticky="w", padx=5)
 
     def get_result_entries(self):
