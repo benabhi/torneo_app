@@ -105,6 +105,7 @@ El código está organizado de forma modular para facilitar su mantenimiento y e
 │   └── test_logic.py                   # Tests para las reglas del torneo
 ├── docs/                               # Documentación varia
 │   ├── Wireframe - Fase X.png.py       # Archivos de imagen de los wireframes de la app
+│   ├── analisis_diseño.pdf             # Documento de análisis y diseño de la aplicación
 │   └── database.sql                    # Código SQL para crear la base de datos
 ├── scripts/                            # Scripts varios para desarrollo
 │   ├── bundle.bat                      # Todo el codigo fuente en un solo archivo (importante para IA)
